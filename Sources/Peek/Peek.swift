@@ -10,6 +10,7 @@ import Carbon.HIToolbox
 import CoreImage
 import ServiceManagement
 import CoreServices
+import UniformTypeIdentifiers
 
 // MARK: - Entry
 
@@ -1557,6 +1558,16 @@ enum DragMode {
     }
     func flush() { if dirty { renderTask?.cancel(); renderNow() } }
 
+    /// The file on disk with every mark baked in, for sharing or saving.
+    func exportURL() -> URL {
+        commitText()
+        renderTask?.cancel()
+        renderNow()
+        imageWork.sync(flags: .barrier) {}
+        if !FileManager.default.fileExists(atPath: shot.url.path) { try? shot.png.write(to: shot.url, options: .atomic) }
+        return shot.url
+    }
+
     /// Bakes the markup into the image and copies it. The main thread only composites; the clipboard gets a
     /// promise right away, and PNG encoding, the file write and the thumbnail happen in the background.
     func renderNow() {
@@ -1619,7 +1630,9 @@ struct EditorView: View {
                 Spacer()
                 hint
                 EditorToolbar(m: m, tool: m.tool, color: m.color, scale: m.scale, canUndo: m.canUndo,
-                              paletteOpen: m.paletteOpen, ns: ns, done: done)
+                              paletteOpen: m.paletteOpen, ns: ns, done: done,
+                              share: { r in Export.share([m.exportURL()], from: r) },
+                              save: { Export.save([m.exportURL()], in: NSApp.keyWindow) })
                     .equatable()
                     .offset(y: appeared ? 0 : 50)
                     .opacity(appeared ? 1 : 0)
@@ -1762,6 +1775,8 @@ struct EditorToolbar: View, Equatable {
     let paletteOpen: Bool
     let ns: Namespace.ID
     let done: () -> Void
+    var share: (ViewRef) -> Void = { _ in }
+    var save: () -> Void = {}
     @Namespace private var sizeNS
 
     static func == (a: Self, b: Self) -> Bool {
@@ -1791,6 +1806,14 @@ struct EditorToolbar: View, Equatable {
                     .frame(width: 34, height: 32).contentShape(Rectangle())
             }
             .buttonStyle(Squish()).disabled(!canUndo).help("Undo  ⌘Z")
+            sep
+            ShareIcon(tint: .white.opacity(0.85), action: share)
+            Button(action: save) {
+                Image(systemName: "arrow.down.to.line").font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 34, height: 32).contentShape(Rectangle())
+            }
+            .buttonStyle(Squish()).help("Save As  ⌘S")
             Button(action: done) {
                 Text("Done").font(.system(size: 13, weight: .semibold)).foregroundStyle(.black)
                     .padding(.horizontal, 16).frame(height: 32)
@@ -1906,6 +1929,7 @@ struct EditorToolbar: View, Equatable {
             case "z": if f.contains(.shift) { m.redo() } else { m.undo() }; return nil
             case "c": m.renderNow(); return nil
             case "w": close(hideApp: true); return nil
+            case "s": Export.save([m.exportURL()], in: window); return nil
             default: return e
             }
         }
@@ -1941,6 +1965,78 @@ struct EditorToolbar: View, Equatable {
     }
 
     func windowWillClose(_ notification: Notification) { close(hideApp: false) }
+}
+
+
+// MARK: - Share and save
+
+/// Holds the AppKit view behind a SwiftUI control so the share menu can open right under it.
+final class ViewRef { weak var view: NSView? }
+struct Anchor: NSViewRepresentable {
+    let ref: ViewRef
+    func makeNSView(context: Context) -> NSView { let v = NSView(); ref.view = v; return v }
+    func updateNSView(_ v: NSView, context: Context) { ref.view = v }
+}
+
+/// AirDrop, Messages, Mail and the rest of the system share menu, plus Save As, for one screenshot or several.
+@MainActor enum Export {
+    static func share(_ urls: [URL], from ref: ViewRef) {
+        guard !urls.isEmpty, let v = ref.view else { return }
+        NSSharingServicePicker(items: urls).show(relativeTo: v.bounds, of: v, preferredEdge: .maxY)
+    }
+
+    static func save(_ urls: [URL], in window: NSWindow?) {
+        guard let first = urls.first else { return }
+        let fm = FileManager.default
+        if urls.count == 1 {
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = first.lastPathComponent
+            panel.allowedContentTypes = [.png]
+            panel.canCreateDirectories = true
+            run(panel, window) {
+                guard let dest = panel.url else { return }
+                try? fm.removeItem(at: dest)
+                try? fm.copyItem(at: first, to: dest)
+            }
+        } else {
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.canCreateDirectories = true
+            panel.prompt = "Save \(urls.count) Screenshots"
+            run(panel, window) {
+                guard let dir = panel.url else { return }
+                for u in urls {
+                    var dest = dir.appendingPathComponent(u.lastPathComponent)
+                    var n = 2
+                    while fm.fileExists(atPath: dest.path) {
+                        dest = dir.appendingPathComponent("\(u.deletingPathExtension().lastPathComponent) \(n).png"); n += 1
+                    }
+                    try? fm.copyItem(at: u, to: dest)
+                }
+            }
+        }
+    }
+
+    private static func run(_ panel: NSSavePanel, _ window: NSWindow?, _ ok: @escaping () -> Void) {
+        if let window { panel.beginSheetModal(for: window) { if $0 == .OK { ok() } } }
+        else { NSApp.activate(ignoringOtherApps: true); if panel.runModal() == .OK { ok() } }
+    }
+}
+
+/// A quiet icon button that remembers where it sits on screen, for anchoring the share menu.
+struct ShareIcon: View {
+    let tint: Color
+    let action: (ViewRef) -> Void
+    @State private var ref = ViewRef()
+    var body: some View {
+        Button { action(ref) } label: {
+            Image(systemName: "square.and.arrow.up").font(.system(size: 13, weight: .semibold)).foregroundStyle(tint)
+                .frame(width: 34, height: 32).contentShape(Rectangle())
+                .background(Anchor(ref: ref))
+        }
+        .buttonStyle(Squish()).help("Share or AirDrop")
+    }
 }
 
 // MARK: - Library
@@ -2331,6 +2427,12 @@ struct LibTile: View {
             .contextMenu {
                 Button("Copy") { m.click(item.url) }
                 Button("Mark Up") { m.markup(item.url) }
+                Menu("Share") {
+                    ForEach(NSSharingService.sharingServices(forItems: [item.url]), id: \.title) { svc in
+                        Button { svc.perform(withItems: [item.url]) } label: { Label { Text(svc.title) } icon: { Image(nsImage: svc.image) } }
+                    }
+                }
+                Button("Save As…") { Export.save([item.url], in: NSApp.keyWindow) }
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
                 Divider()
                 Button("Move to Trash") { m.trash(item.url) }
@@ -2361,6 +2463,8 @@ struct SelectionBar: View {
                 .buttonStyle(Squish()).help("Mark up  Return")
                 .transition(.pop)
             }
+            ShareIcon(tint: .white) { r in Export.share(m.selection, from: r) }
+            bar("arrow.down.to.line", "Save As") { Export.save(m.selection, in: NSApp.keyWindow) }
             bar("folder", "Show in Finder") { m.reveal() }
             bar("trash", "Move to Trash  Delete") { m.trashSelection() }
             bar("xmark", "Deselect  Esc") { m.clear() }
