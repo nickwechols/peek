@@ -1,0 +1,31 @@
+name: Bug report
+description: Something in Peek isn't working
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 15.1
+    validations:
+      required: true
+  - type: dropdown
+    id: mac
+    attributes:
+      label: Mac
+      options: [Apple silicon, Intel]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Peek version
+      description: Peek menu bar icon, then About, or the release you downloaded.
+      placeholder: "1.0.0"

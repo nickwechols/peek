@@ -1,0 +1,16 @@
+# Swift Package Manager and Xcode
+.build/
+.swiftpm/
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+
+# Build output (installers are attached to GitHub Releases, not committed)
+build/
+*.dmg
+
+# Tooling
+node_modules/
+
+# macOS
+.DS_Store

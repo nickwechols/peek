@@ -1,0 +1,28 @@
+# Builds Peek.dmg on a Mac runner and attaches it to a GitHub Release when a version tag is pushed.
+#   git tag v1.0.0 && git push origin v1.0.0
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app and installer
+        env:
+          VERSION: ${{ github.ref_name }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          export VERSION="${VERSION#v}"
+          ./scripts/build.sh
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/Peek.dmg
+          generate_release_notes: true

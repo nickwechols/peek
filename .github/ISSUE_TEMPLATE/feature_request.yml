@@ -1,0 +1,11 @@
+name: Idea
+description: Suggest something that would make Peek better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like Peek to do, and when would you use it?
+    validations:
+      required: true

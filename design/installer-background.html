@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- Source art for the installer window (Resources/Installer/background*.png).
+     Rendered at 1x and 2x with scripts/render-installer.js. Finder draws the two icons and their labels on top,
+     so the icon row sits on the calm blue part of the sky where both light and dark mode labels stay readable. -->
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+@font-face{font-family:Geist;src:url(../Resources/Fonts/Geist-SemiBold.ttf);font-weight:600}
+@font-face{font-family:Geist;src:url(../Resources/Fonts/Geist-Medium.ttf);font-weight:500}
+html,body{margin:0;width:640px;height:400px;overflow:hidden;background:#6f7fe0}
+.sky{position:absolute;inset:0;background:url(../site/keys-sky.jpg) center 0/auto 540px no-repeat}
+.shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(54,66,170,.28) 0%,rgba(54,66,170,.06) 46%,rgba(0,0,0,0) 62%)}
+.head{position:absolute;left:0;right:0;top:46px;text-align:center;color:#fff;font-family:Geist;-webkit-font-smoothing:antialiased}
+.head h1{margin:0;font-weight:600;font-size:23px;letter-spacing:-.035em;line-height:1.1;text-shadow:0 1px 14px rgba(30,40,120,.25)}
+.head p{margin:8px 0 0;font-weight:500;font-size:13px;letter-spacing:-.01em;opacity:.82}
+.arrow{position:absolute;left:320px;top:196px;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;color:#fff}
+.arrow i{font-size:26px;filter:drop-shadow(0 2px 8px rgba(30,40,120,.3))}
+.arrow .dots{display:flex;gap:7px}.arrow .dots b{width:5px;height:5px;border-radius:50%;background:#fff;opacity:.45}
+.arrow .dots b:nth-child(2){opacity:.65}.arrow .dots b:nth-child(3){opacity:.85}
+</style></head><body>
+<div class="sky"></div><div class="shade"></div>
+<div class="head"><h1>Drag Peek into Applications</h1><p>Then open it from your Applications folder.</p></div>
+<div class="arrow"><div class="dots"><b></b><b></b><b></b></div><i class="ph-bold ph-arrow-right"></i></div>
+</body></html>
