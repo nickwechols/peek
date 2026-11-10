@@ -14,3 +14,10 @@ node_modules/
 
 # macOS
 .DS_Store
+
+# Signing secrets never belong in the repo
+*.p12
+*.p8
+*.pem
+SIGNING_*
+peek-signing/

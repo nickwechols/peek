@@ -18,9 +18,11 @@ jobs:
         env:
           VERSION: ${{ github.ref_name }}
           BUILD_NUMBER: ${{ github.run_number }}
+          SIGNING_P12: ${{ secrets.SIGNING_P12 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
         run: |
           export VERSION="${VERSION#v}"
-          ./scripts/build.sh
+          bash ./scripts/build.sh
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:

@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${VERSION:-1.2.0}"
+VERSION="${VERSION:-1.3.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
 APP=build/Peek.app
 VOL="Peek"
@@ -53,11 +53,31 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 
+# Signing. macOS keys the Screen Recording permission to the signature, so every release must be signed by the
+# same certificate or users are asked again after each update.
+#   DEVELOPER_ID      a Developer ID identity (best: also clears Gatekeeper once notarized)
+#   SIGNING_P12 + SIGNING_P12_PASSWORD   a base64 .p12 of Peek's own self-signed certificate (same identity every release)
+#   neither           ad-hoc, for local builds
+SIGNED=""
 if [ -n "${DEVELOPER_ID:-}" ]; then
-  codesign --force --options runtime --timestamp -s "$DEVELOPER_ID" "$APP"
-else
+  codesign --force --options runtime --timestamp -s "$DEVELOPER_ID" "$APP" && SIGNED=1
+elif [ -n "${SIGNING_P12:-}" ]; then
+  KC="$PWD/build/signing.keychain-db"
+  security create-keychain -p peek "$KC"
+  security set-keychain-settings "$KC"
+  security unlock-keychain -p peek "$KC"
+  echo "$SIGNING_P12" | base64 --decode > build/signing.p12
+  security import build/signing.p12 -k "$KC" -P "${SIGNING_P12_PASSWORD:-}" -T /usr/bin/codesign
+  rm -f build/signing.p12
+  security set-key-partition-list -S apple-tool:,apple: -s -k peek "$KC" >/dev/null
+  security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+  HASH=$(security find-certificate -a -Z "$KC" | awk '/SHA-1/{print $NF; exit}')
+  codesign --force --keychain "$KC" -s "$HASH" "$APP" && SIGNED=1
+fi
+if [ -z "$SIGNED" ]; then
   codesign --force -s - "$APP"     # ad-hoc: runs anywhere, first launch asks for "Open Anyway"
 fi
+codesign -dr - "$APP" 2>&1 | tail -1
 
 # Installer: Peek and an Applications shortcut on the sky background
 STAGE=build/dmg

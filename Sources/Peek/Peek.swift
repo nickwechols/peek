@@ -2748,6 +2748,29 @@ struct SettingsView: View {
     }
 }
 
+// MARK: - Screen recording across updates
+
+/// macOS ties the Screen Recording grant to the app's code signature. When an update arrives with a different
+/// signature, Settings still shows Peek switched on, but the switch belongs to the old build and the new one is
+/// refused. Peek remembers that it was allowed before; if that is no longer true, it removes the stale entry and asks
+/// again straight away, so the user sees one ordinary system prompt instead of a switch that is on but does nothing.
+enum ScreenAccess {
+    private static let key = "screenAccessGranted"
+
+    static func note() { if CGPreflightScreenCaptureAccess() { UserDefaults.standard.set(true, forKey: key) } }
+
+    static func healIfStale() {
+        if CGPreflightScreenCaptureAccess() { UserDefaults.standard.set(true, forKey: key); return }
+        guard UserDefaults.standard.bool(forKey: key), let id = Bundle.main.bundleIdentifier else { return }
+        UserDefaults.standard.set(false, forKey: key)
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        p.arguments = ["reset", "ScreenCapture", id]     // only Peek's own entry
+        p.terminationHandler = { _ in DispatchQueue.main.async { _ = CGRequestScreenCaptureAccess() } }
+        try? p.run()
+    }
+}
+
 // MARK: - Setup wizard
 
 @MainActor final class SetupModel: ObservableObject {
@@ -2764,6 +2787,7 @@ struct SettingsView: View {
     }
     @objc func check() {
         let p = CGPreflightScreenCaptureAccess()
+        if p { ScreenAccess.note() }
         if p != hasPermission { withAnimation(snappy) { hasPermission = p } }
     }
     func requestPermission() {
@@ -3050,7 +3074,7 @@ struct SetupView: View {
             if m.atLogin, SMAppService.mainApp.status != .enabled { try? SMAppService.mainApp.register() }
             self?.captureArea()
         }
-        if !UserDefaults.standard.bool(forKey: "onboarded") { setup.show() }
+        if !UserDefaults.standard.bool(forKey: "onboarded") { setup.show() } else { ScreenAccess.healIfStale() }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
