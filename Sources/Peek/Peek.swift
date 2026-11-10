@@ -1143,6 +1143,15 @@ final class TrayHost<C: View>: NSHostingView<C> {
         flash(s.id)
     }
 
+    /// What the tray header is talking about: the picked screenshots in paste order, otherwise the whole tray.
+    /// Files are written lazily, so make sure each one exists before handing it to the share menu.
+    func shareURLs() -> [URL] {
+        let ids = tray.copied.count > 1 ? tray.copied : tray.shots.map(\.id)
+        let list = ids.compactMap { id in tray.shots.first { $0.id == id } }
+        for s in list where !FileManager.default.fileExists(atPath: s.url.path) { try? s.png.write(to: s.url, options: .atomic) }
+        return list.map(\.url)
+    }
+
     func copyAll() {
         copy(ids: tray.shots.map(\.id))
         if let last = tray.shots.last { flash(last.id) }
@@ -1237,6 +1246,10 @@ struct TrayView: View {
                 }
                 .buttonStyle(Squish())
                 .help("Copy every screenshot in the tray, oldest first")
+            }
+            ShareIcon(tint: .white, size: CGSize(width: 30, height: 26),
+                      help: t.copied.count > 1 ? "Share \(t.copied.count) or AirDrop" : (t.shots.count > 1 ? "Share all or AirDrop" : "Share or AirDrop")) { r in
+                Export.share(c.shareURLs(), from: r)
             }
             Button { c.actions.openLibrary() } label: {
                 Image(systemName: "square.grid.2x2").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
@@ -2027,15 +2040,17 @@ struct Anchor: NSViewRepresentable {
 /// A quiet icon button that remembers where it sits on screen, for anchoring the share menu.
 struct ShareIcon: View {
     let tint: Color
+    var size = CGSize(width: 34, height: 32)
+    var help = "Share or AirDrop"
     let action: (ViewRef) -> Void
     @State private var ref = ViewRef()
     var body: some View {
         Button { action(ref) } label: {
-            Image(systemName: "square.and.arrow.up").font(.system(size: 13, weight: .semibold)).foregroundStyle(tint)
-                .frame(width: 34, height: 32).contentShape(Rectangle())
+            Image(systemName: "square.and.arrow.up").font(.system(size: size.height < 30 ? 12 : 13, weight: .semibold)).foregroundStyle(tint)
+                .frame(width: size.width, height: size.height).contentShape(Rectangle())
                 .background(Anchor(ref: ref))
         }
-        .buttonStyle(Squish()).help("Share or AirDrop")
+        .buttonStyle(Squish()).help(help)
     }
 }
 
