@@ -423,7 +423,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .files{position:absolute;inset:30px 0 0 0;z-index:2}
 .file2{position:absolute;width:86px;display:flex;flex-direction:column;align-items:center;gap:5px;font:500 10.5px/1.25 var(--mac);color:#fff;text-align:center;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 .file2 .ic{width:42px;height:52px;border-radius:3px;background:#fff;padding:3px;box-shadow:0 3px 8px rgba(0,0,0,.25)}
-.file2 .ic i{display:block;width:100%;height:100%;border-radius:1px;background:linear-gradient(160deg,#bfcdfb,#f3d6e3 70%,#ffe6c9)}
+.file2 .ic i{display:block;width:100%;height:100%;border-radius:1px;background:url(desk/icons.webp) 0 0/1944px 46px no-repeat,linear-gradient(160deg,#bfcdfb,#f3d6e3 70%,#ffe6c9)}
 .pile-tray{position:absolute;left:50%;bottom:7%;z-index:6;display:flex;flex-direction:column;align-items:center;gap:8px}
 
 /* ---------- Use case: the real Mac, with a notch ---------- */
@@ -866,7 +866,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
     <div class="fglass">
   <div class="fgrid">
     <div><a class="brand" href="#top" style="padding:0"><svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 35V25Q15 15 25 15H35"/><path d="M65 15H75Q85 15 85 25V35"/><path d="M85 65V75Q85 85 75 85H65"/><path d="M35 85H25Q15 85 15 75V65"/></g><g fill="currentColor"><rect class="eye" x="40.5" y="31" width="9.5" height="31" rx="4.75"/><rect class="eye" x="56.5" y="31" width="9.5" height="31" rx="4.75"/></g></svg>Peek</a><p class="tag">The screenshot app your Mac deserves.</p></div>
-    <div><h6>Product</h6><a href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download>Download</a><a href="#show">How it works</a><a href="#several">Copy several</a><a href="#markup">Mark up</a><a href="https://github.com/nickwechols/peek">Source code</a></div>
+    <div><h6>Product</h6><a href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download>Download</a><a href="#show">How it works</a><a href="#several">Copy several</a><a href="#markup">Mark up</a></div>
     <div><h6>Shortcuts</h6><span class="kb"><kbd>⇧ ⌘ 2</kbd>Capture an area</span><span class="kb"><kbd>⇧ ⌘ 1</kbd>Capture the screen</span><span class="kb"><kbd>⇧ ⌘ L</kbd>Open the library</span></div>
     <div><h6>Made by</h6><a href="https://instagram.com/fromnickechols">Nick Echols</a><a href="https://github.com/nickwechols">GitHub</a></div>
   </div>
@@ -977,7 +977,7 @@ function buildHero(){
 /* ---------- Motion moment: screenshots pile up on the Desktop, then Peek clears them ---------- */
 const files = $('#files'), pplate = $('#pplate'), ptray = $('#ptray');
 gsap.set(ptray, {xPercent:-50});
-['home','invite','profile'].forEach((k, i) => { const t = thumb(k, 118, 76, i+1); pplate.append(t); gsap.set(t.querySelectorAll('.rg,.n'), {opacity:1}); });
+[1, 2, 3].forEach((k, i) => { const im = new Image(118, 76); im.src = `desk/tray-${k}.webp`; im.alt = ''; im.decoding = 'async'; im.style.cssText = 'display:block;width:118px;height:76px;object-fit:cover'; const t = thumb(im, 118, 76, i+1); pplate.append(t); gsap.set(t.querySelectorAll('.rg,.n'), {opacity:1}); });
 let pileTl;
 function buildPile(){
   if (pileTl){ pileTl.scrollTrigger && pileTl.scrollTrigger.kill(); pileTl.kill(); }
@@ -994,7 +994,7 @@ function buildPile(){
     const h = 9 + Math.floor(sec/3600), m = Math.floor(sec/60) % 60, s = sec % 60;
     const f = document.createElement('div'); f.className = 'file2';
     f.style.left = (W - 16 - colW*(c+1)) + 'px'; f.style.top = (top + r*rowH) + 'px';
-    f.innerHTML = `<div class="ic"><i></i></div><span>Screenshot 2026-11-09<br>at ${h > 12 ? h-12 : h}.${String(m).padStart(2,'0')}.${String(s).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}</span>`;
+    f.innerHTML = `<div class="ic"><i style="background-position:${-(i % 54)*36}px 0"></i></div><span>Screenshot 2026-11-09<br>at ${h > 12 ? h-12 : h}.${String(m).padStart(2,'0')}.${String(s).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}</span>`;
     files.append(f); nodes.push(f);
   }
   const tx = W/2, ty = H - 30 - H*.07 - 60;
