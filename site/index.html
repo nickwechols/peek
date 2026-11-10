@@ -5,16 +5,167 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Peek for Mac</title>
 <meta name="description" content="Every screenshot goes straight to your clipboard. Paste it anywhere, and never dig through your Desktop again.">
+<meta name="theme-color" content="#87a6f6">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Peek, the screenshot app your Mac deserves">
+<meta property="og:description" content="Every screenshot goes straight to your clipboard. Free and open source for macOS.">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2315161b%22%20stroke-width%3D%228.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M15%2035V25Q15%2015%2025%2015H35%22/%3E%3Cpath%20d%3D%22M65%2015H75Q85%2015%2085%2025V35%22/%3E%3Cpath%20d%3D%22M85%2065V75Q85%2085%2075%2085H65%22/%3E%3Cpath%20d%3D%22M35%2085H25Q15%2085%2015%2075V65%22/%3E%3C/g%3E%3Cg%20fill%3D%22%2315161b%22%3E%3Crect%20x%3D%2240.5%22%20y%3D%2231%22%20width%3D%229.5%22%20height%3D%2231%22%20rx%3D%224.75%22/%3E%3Crect%20x%3D%2256.5%22%20y%3D%2231%22%20width%3D%229.5%22%20height%3D%2231%22%20rx%3D%224.75%22/%3E%3C/g%3E%3C/svg%3E">
-<link rel="preload" as="image" href="hero-sky.jpg">
+<link rel="preload" as="image" href="hero-sky.webp">
+<link rel="preload" href="fonts/Phosphor-Fill.woff2" as="font" type="font/woff2" crossorigin>
+<style>/* Phosphor Icons (MIT), subset to the glyphs this page uses */
+@font-face{font-family:"Phosphor";src:url(fonts/Phosphor.woff2) format("woff2");font-display:block}
+.ph { /* use !important to prevent issues with browser extensions that change fonts */ font-family: "Phosphor" !important; speak: never; font-style: normal; font-weight: normal; font-variant: normal; text-transform: none; line-height: 1; /* Enable Ligatures ================ */ letter-spacing: 0; -webkit-font-feature-settings: "liga"; -moz-font-feature-settings: "liga=1"; -moz-font-feature-settings: "liga"; -ms-font-feature-settings: "liga" 1; font-feature-settings: "liga"; -webkit-font-variant-ligatures: discretionary-ligatures; font-variant-ligatures: discretionary-ligatures; /* Better Font Rendering =========== */ -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+.ph.ph-apple-logo:before{content:"\e516"}
+.ph.ph-arrow-u-up-left:before{content:"\e08a"}
+.ph.ph-arrow-up:before{content:"\e08e"}
+.ph.ph-arrow-up-right:before{content:"\e092"}
+.ph.ph-at:before{content:"\e0ac"}
+.ph.ph-basketball:before{content:"\e724"}
+.ph.ph-battery-high:before{content:"\e0c2"}
+.ph.ph-bell:before{content:"\e0ce"}
+.ph.ph-caret-down:before{content:"\e136"}
+.ph.ph-cell-signal-high:before{content:"\e144"}
+.ph.ph-chat-circle:before{content:"\e168"}
+.ph.ph-check:before{content:"\e182"}
+.ph.ph-check-circle:before{content:"\e184"}
+.ph.ph-code:before{content:"\e1bc"}
+.ph.ph-copy:before{content:"\e1ca"}
+.ph.ph-corners-in:before{content:"\e1ce"}
+.ph.ph-cursor:before{content:"\e1dc"}
+.ph.ph-device-mobile:before{content:"\e1e0"}
+.ph.ph-diamonds-four:before{content:"\e8f4"}
+.ph.ph-drop-half:before{content:"\e566"}
+.ph.ph-eye-slash:before{content:"\e224"}
+.ph.ph-github-logo:before{content:"\e576"}
+.ph.ph-hash:before{content:"\e2a2"}
+.ph.ph-highlighter:before{content:"\ec76"}
+.ph.ph-house:before{content:"\e2c2"}
+.ph.ph-lock-simple:before{content:"\e308"}
+.ph.ph-magnifying-glass:before{content:"\e30c"}
+.ph.ph-number-circle-one:before{content:"\e36a"}
+.ph.ph-paper-plane-right:before{content:"\e396"}
+.ph.ph-pen-nib:before{content:"\e3ac"}
+.ph.ph-play:before{content:"\e3d0"}
+.ph.ph-plus:before{content:"\e3d4"}
+.ph.ph-plus-circle:before{content:"\e3d6"}
+.ph.ph-rectangle:before{content:"\e3f0"}
+.ph.ph-rows:before{content:"\e5a2"}
+.ph.ph-scribble-loop:before{content:"\e662"}
+.ph.ph-sidebar-simple:before{content:"\ec24"}
+.ph.ph-smiley:before{content:"\e436"}
+.ph.ph-square:before{content:"\e45e"}
+.ph.ph-squares-four:before{content:"\e464"}
+.ph.ph-star:before{content:"\e46a"}
+.ph.ph-text-aa:before{content:"\e6ee"}
+.ph.ph-text-t:before{content:"\e48a"}
+.ph.ph-toggle-right:before{content:"\e676"}
+.ph.ph-user:before{content:"\e4c2"}
+.ph.ph-warning-circle:before{content:"\e4e2"}
+.ph.ph-wifi-high:before{content:"\e4ea"}
+.ph.ph-x:before{content:"\e4f6"}
+@font-face{font-family:"Phosphor-Bold";src:url(fonts/Phosphor-Bold.woff2) format("woff2");font-display:block}
+.ph-bold { /* use !important to prevent issues with browser extensions that change fonts */ font-family: "Phosphor-Bold" !important; speak: never; font-style: normal; font-weight: normal; font-variant: normal; text-transform: none; line-height: 1; /* Enable Ligatures ================ */ letter-spacing: 0; -webkit-font-feature-settings: "liga"; -moz-font-feature-settings: "liga=1"; -moz-font-feature-settings: "liga"; -ms-font-feature-settings: "liga" 1; font-feature-settings: "liga"; -webkit-font-variant-ligatures: discretionary-ligatures; font-variant-ligatures: discretionary-ligatures; /* Better Font Rendering =========== */ -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+.ph-bold.ph-apple-logo:before{content:"\e516"}
+.ph-bold.ph-arrow-u-up-left:before{content:"\e08a"}
+.ph-bold.ph-arrow-up:before{content:"\e08e"}
+.ph-bold.ph-arrow-up-right:before{content:"\e092"}
+.ph-bold.ph-at:before{content:"\e0ac"}
+.ph-bold.ph-basketball:before{content:"\e724"}
+.ph-bold.ph-battery-high:before{content:"\e0c2"}
+.ph-bold.ph-bell:before{content:"\e0ce"}
+.ph-bold.ph-caret-down:before{content:"\e136"}
+.ph-bold.ph-cell-signal-high:before{content:"\e144"}
+.ph-bold.ph-chat-circle:before{content:"\e168"}
+.ph-bold.ph-check:before{content:"\e182"}
+.ph-bold.ph-check-circle:before{content:"\e184"}
+.ph-bold.ph-code:before{content:"\e1bc"}
+.ph-bold.ph-copy:before{content:"\e1ca"}
+.ph-bold.ph-corners-in:before{content:"\e1ce"}
+.ph-bold.ph-cursor:before{content:"\e1dc"}
+.ph-bold.ph-device-mobile:before{content:"\e1e0"}
+.ph-bold.ph-diamonds-four:before{content:"\e8f4"}
+.ph-bold.ph-drop-half:before{content:"\e566"}
+.ph-bold.ph-eye-slash:before{content:"\e224"}
+.ph-bold.ph-hash:before{content:"\e2a2"}
+.ph-bold.ph-highlighter:before{content:"\ec76"}
+.ph-bold.ph-house:before{content:"\e2c2"}
+.ph-bold.ph-lock-simple:before{content:"\e308"}
+.ph-bold.ph-magnifying-glass:before{content:"\e30c"}
+.ph-bold.ph-number-circle-one:before{content:"\e36a"}
+.ph-bold.ph-paper-plane-right:before{content:"\e396"}
+.ph-bold.ph-pen-nib:before{content:"\e3ac"}
+.ph-bold.ph-play:before{content:"\e3d0"}
+.ph-bold.ph-plus:before{content:"\e3d4"}
+.ph-bold.ph-plus-circle:before{content:"\e3d6"}
+.ph-bold.ph-rectangle:before{content:"\e3f0"}
+.ph-bold.ph-rows:before{content:"\e5a2"}
+.ph-bold.ph-scribble-loop:before{content:"\e662"}
+.ph-bold.ph-sidebar-simple:before{content:"\ec24"}
+.ph-bold.ph-smiley:before{content:"\e436"}
+.ph-bold.ph-square:before{content:"\e45e"}
+.ph-bold.ph-squares-four:before{content:"\e464"}
+.ph-bold.ph-star:before{content:"\e46a"}
+.ph-bold.ph-text-aa:before{content:"\e6ee"}
+.ph-bold.ph-text-t:before{content:"\e48a"}
+.ph-bold.ph-toggle-right:before{content:"\e676"}
+.ph-bold.ph-user:before{content:"\e4c2"}
+.ph-bold.ph-warning-circle:before{content:"\e4e2"}
+.ph-bold.ph-wifi-high:before{content:"\e4ea"}
+.ph-bold.ph-x:before{content:"\e4f6"}
+@font-face{font-family:"Phosphor-Fill";src:url(fonts/Phosphor-Fill.woff2) format("woff2");font-display:block}
+.ph-fill { /* use !important to prevent issues with browser extensions that change fonts */ font-family: "Phosphor-Fill" !important; speak: never; font-style: normal; font-weight: normal; font-variant: normal; text-transform: none; line-height: 1; /* Enable Ligatures ================ */ letter-spacing: 0; -webkit-font-feature-settings: "liga"; -moz-font-feature-settings: "liga=1"; -moz-font-feature-settings: "liga"; -ms-font-feature-settings: "liga" 1; font-feature-settings: "liga"; -webkit-font-variant-ligatures: discretionary-ligatures; font-variant-ligatures: discretionary-ligatures; /* Better Font Rendering =========== */ -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+.ph-fill.ph-apple-logo:before{content:"\e516"}
+.ph-fill.ph-arrow-u-up-left:before{content:"\e08a"}
+.ph-fill.ph-arrow-up:before{content:"\e08e"}
+.ph-fill.ph-arrow-up-right:before{content:"\e092"}
+.ph-fill.ph-at:before{content:"\e0ac"}
+.ph-fill.ph-basketball:before{content:"\e724"}
+.ph-fill.ph-battery-high:before{content:"\e0c2"}
+.ph-fill.ph-bell:before{content:"\e0ce"}
+.ph-fill.ph-caret-down:before{content:"\e136"}
+.ph-fill.ph-cell-signal-high:before{content:"\e144"}
+.ph-fill.ph-chat-circle:before{content:"\e168"}
+.ph-fill.ph-check:before{content:"\e182"}
+.ph-fill.ph-check-circle:before{content:"\e184"}
+.ph-fill.ph-code:before{content:"\e1bc"}
+.ph-fill.ph-copy:before{content:"\e1ca"}
+.ph-fill.ph-corners-in:before{content:"\e1ce"}
+.ph-fill.ph-cursor:before{content:"\e1dc"}
+.ph-fill.ph-device-mobile:before{content:"\e1e0"}
+.ph-fill.ph-diamonds-four:before{content:"\e8f4"}
+.ph-fill.ph-drop-half:before{content:"\e566"}
+.ph-fill.ph-eye-slash:before{content:"\e224"}
+.ph-fill.ph-hash:before{content:"\e2a2"}
+.ph-fill.ph-highlighter:before{content:"\ec76"}
+.ph-fill.ph-house:before{content:"\e2c2"}
+.ph-fill.ph-lock-simple:before{content:"\e308"}
+.ph-fill.ph-magnifying-glass:before{content:"\e30c"}
+.ph-fill.ph-number-circle-one:before{content:"\e36a"}
+.ph-fill.ph-paper-plane-right:before{content:"\e396"}
+.ph-fill.ph-pen-nib:before{content:"\e3ac"}
+.ph-fill.ph-play:before{content:"\e3d0"}
+.ph-fill.ph-plus:before{content:"\e3d4"}
+.ph-fill.ph-plus-circle:before{content:"\e3d6"}
+.ph-fill.ph-rectangle:before{content:"\e3f0"}
+.ph-fill.ph-rows:before{content:"\e5a2"}
+.ph-fill.ph-scribble-loop:before{content:"\e662"}
+.ph-fill.ph-sidebar-simple:before{content:"\ec24"}
+.ph-fill.ph-smiley:before{content:"\e436"}
+.ph-fill.ph-square:before{content:"\e45e"}
+.ph-fill.ph-squares-four:before{content:"\e464"}
+.ph-fill.ph-star:before{content:"\e46a"}
+.ph-fill.ph-text-aa:before{content:"\e6ee"}
+.ph-fill.ph-text-t:before{content:"\e48a"}
+.ph-fill.ph-toggle-right:before{content:"\e676"}
+.ph-fill.ph-user:before{content:"\e4c2"}
+.ph-fill.ph-warning-circle:before{content:"\e4e2"}
+.ph-fill.ph-wifi-high:before{content:"\e4ea"}
+.ph-fill.ph-x:before{content:"\e4f6"}
+</style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap">
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/bold/style.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <style>
 /* Design read: premium consumer Mac utility, calm SaaS (Mercury / Granola calm), one family (Geist).
    Dials: VARIANCE 7, MOTION 8, DENSITY 2. Light theme, ink + one accent (Peek blue = "it's on your clipboard").
@@ -52,7 +203,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 
 /* ---------- Hero: Peek screenshots its own sky ---------- */
 .hero{position:relative;isolation:isolate;min-height:max(640px,100vh);min-height:max(640px,100dvh);padding:calc(64px + 8vh) 0 0;text-align:center;overflow-x:clip;overflow-y:visible}
-.sky{position:absolute;inset:0;z-index:-2;background:url("hero-sky.jpg") center 30%/cover no-repeat,linear-gradient(#8fa8f5,#d8c4f0 60%,#fff)}
+.sky{position:absolute;inset:0;z-index:-2;background:url("hero-sky.webp") center 30%/cover no-repeat,linear-gradient(#8fa8f5,#d8c4f0 60%,#fff)}
 .hero::after{content:"";position:absolute;inset:auto 0 0;height:18%;background:linear-gradient(transparent,var(--bg));z-index:-1}
 .hero h1{font-size:clamp(40px,min(6.4vw,9.5vh),88px);line-height:1;color:#111218;max-width:13ch;margin:0 auto}
 .hero p.sub{color:#262832;font-size:clamp(17px,1.5vw,19.5px);line-height:1.5;max-width:38ch;margin:22px auto 30px}
@@ -64,7 +215,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .hcur::before,.hcur::after{content:"";position:absolute;background:#111;box-shadow:0 0 0 1px rgba(255,255,255,.9)}
 .hcur::before{left:12.5px;top:0;width:1px;height:26px}.hcur::after{top:12.5px;left:0;height:1px;width:26px}
 .ghost{position:absolute;overflow:hidden;z-index:4;border-radius:2px;pointer-events:none;opacity:0;box-shadow:0 20px 40px -16px rgba(20,25,60,.5)}
-.crop{position:absolute;left:0;top:0;transform-origin:0 0;background:url("hero-sky.jpg") center 30%/cover no-repeat}
+.crop{position:absolute;left:0;top:0;transform-origin:0 0;background:url("hero-sky.webp") center 30%/cover no-repeat}
 .htray{position:absolute;left:50%;bottom:8vh;z-index:3;display:flex;flex-direction:column;align-items:center;gap:8px}
 .htray .plate{box-shadow:inset 0 0 0 .5px rgba(255,255,255,.32),0 18px 40px -18px rgba(40,40,90,.45)}
 .htray .plate .thumb{width:126px;height:84px;overflow:hidden}
@@ -73,6 +224,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .mac *,.scene *,.pile *{font-family:var(--mac)}
 .mac,.mac *,.scene,.scene *{transition:none!important}
 .scene{position:relative;width:100%;aspect-ratio:var(--ar)}
+@media (max-width:600px){.scene{overflow:hidden}}
 .scene>.inner{position:absolute;left:0;top:0;transform-origin:0 0}
 </style>
 <style>
@@ -85,7 +237,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .lights span{width:12px;height:12px;border-radius:50%;background:#ff5f57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)}
 .lights span:nth-child(2){background:#febc2e}
 .lights span:nth-child(3){background:#28c840}
-.kv{position:absolute;left:1020px;top:560px;display:flex;gap:8px;z-index:45;opacity:0;transform:translateY(10px) scale(.9);transition:all .35s var(--spring)}
+.kv{position:absolute;left:1020px;top:560px;display:flex;gap:8px;z-index:45;opacity:0;transform:translateY(10px) scale(.9);}
 .kv.on{opacity:1;transform:none}
 .kv span{font:600 18px var(--mac);min-width:48px;height:48px;padding:0 12px;display:grid;place-items:center;border-radius:11px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.1),0 4px 0 rgba(0,0,0,.12),0 16px 30px -14px rgba(0,0,0,.5)}
 .marquee{position:absolute;border:1px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.2);z-index:41;opacity:0;pointer-events:none}
@@ -101,31 +253,32 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .cursor.x .arrow{display:none}
 .cursor.x .cross{display:block}
 .cursor.down .arrow{transform:scale(.82)}
-.cursor .mod{position:absolute;left:22px;top:22px;font:600 12px var(--mac);background:#fff;border-radius:6px;padding:3px 7px;box-shadow:0 0 0 1px rgba(0,0,0,.15),0 4px 10px -4px rgba(0,0,0,.3);opacity:0;transform:scale(.7);transition:all .25s var(--spring)}
+.cursor .mod{position:absolute;left:22px;top:22px;font:600 12px var(--mac);background:#fff;border-radius:6px;padding:3px 7px;box-shadow:0 0 0 1px rgba(0,0,0,.15),0 4px 10px -4px rgba(0,0,0,.3);opacity:0;transform:scale(.7);}
 .cursor.cmd .mod{opacity:1;transform:none}
-.tray{position:absolute;left:640px;bottom:22px;z-index:42;display:flex;flex-direction:column;align-items:center;gap:8px;transform:translate(-50%,46px) scale(.84);opacity:0;filter:blur(16px);transition:all .75s var(--spring)}
+.tray{position:absolute;left:640px;bottom:22px;z-index:42;display:flex;flex-direction:column;align-items:center;gap:8px;transform:translate(-50%,46px) scale(.84);opacity:0;filter:blur(16px);}
 .tray.on{transform:translate(-50%,0) scale(1);opacity:1;filter:none}
-.tray-head{display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px;background:rgba(30,30,34,.72);backdrop-filter:blur(24px);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.28),0 12px 26px -12px rgba(0,0,0,.55);color:#fff;font-size:12.5px;font-weight:600;opacity:0;transform:scale(.9) translateY(6px);transition:all .45s var(--spring)}
+.tray-head{display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px;background:rgba(30,30,34,.72);backdrop-filter:blur(24px);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.28),0 12px 26px -12px rgba(0,0,0,.55);color:#fff;font-size:12.5px;font-weight:600;opacity:0;transform:scale(.9) translateY(6px);}
 .tray.hover .tray-head{opacity:1;transform:none}
 .tray-head .lab{padding:0 10px}
 .tray-head b{background:#fff;color:#111;border-radius:999px;padding:5px 11px;display:flex;gap:5px;align-items:center;font-weight:600}
 .tray-head i{width:30px;text-align:center;font-size:14px}
 .plate{display:flex;gap:8px;padding:8px;border-radius:20px;background:rgba(30,30,34,.5);backdrop-filter:blur(26px) saturate(1.6);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.32),0 24px 46px -16px rgba(0,0,0,.6)}
-.thumb{position:relative;border-radius:12px;transition:all .55s var(--spring)}
+.thumb{position:relative;border-radius:12px;}
 .thumb .shotbox{border-radius:12px}
 .thumb.enter{width:0!important;opacity:0;transform:scale(.6);filter:blur(10px);margin-left:-8px}
 .thumb::after{content:"";position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.25);transition:box-shadow .3s;pointer-events:none}
 .thumb.ring::after{box-shadow:0 0 0 2.5px var(--blue)}
-.thumb .n{position:absolute;left:6px;top:6px;width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;box-shadow:0 0 0 1.5px #fff;opacity:0;transform:scale(.4);transition:all .35s var(--spring);z-index:2}
+.thumb .n{position:absolute;left:6px;top:6px;width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;box-shadow:0 0 0 1.5px #fff;opacity:0;transform:scale(.4);z-index:2}
 .thumb.num .n{opacity:1;transform:none}
-.thumb .ok{position:absolute;inset:0;margin:auto;width:38px;height:38px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-size:18px;opacity:0;transform:scale(.3);transition:all .4s var(--spring);z-index:2;box-shadow:0 8px 18px -6px rgba(0,0,0,.5)}
+.thumb .n,.thumb .ok{z-index:3}
+.thumb .ok{position:absolute;inset:0;margin:auto;width:38px;height:38px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-size:18px;opacity:0;transform:scale(.3);z-index:2;box-shadow:0 8px 18px -6px rgba(0,0,0,.5)}
 .thumb.flash .ok{opacity:1;transform:none}
-.thumb .x,.thumb .pen{position:absolute;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:11px;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.3);opacity:0;transform:scale(.5);transition:all .3s var(--spring);z-index:2}
+.thumb .x,.thumb .pen{position:absolute;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:11px;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.3);opacity:0;transform:scale(.5);z-index:2}
 .thumb .x{right:6px;top:6px}
 .thumb .pen{right:6px;bottom:6px}
 .tray.hover .thumb .x,.tray.hover .thumb .pen{opacity:1;transform:none}
 .editor{position:absolute;left:640px;top:410px;width:720px;height:600px;z-index:43;border-radius:16px;overflow:hidden;background:rgba(34,34,38,.86);backdrop-filter:blur(34px) saturate(1.4);
-  box-shadow:0 0 0 .5px rgba(255,255,255,.2),0 50px 90px -30px rgba(0,0,0,.75);transform:translate(-50%,-48%) scale(.93);opacity:0;transition:all .6s var(--spring);display:flex;flex-direction:column;align-items:center}
+  box-shadow:0 0 0 .5px rgba(255,255,255,.2),0 50px 90px -30px rgba(0,0,0,.75);transform:translate(-50%,-48%) scale(.93);opacity:0;display:flex;flex-direction:column;align-items:center}
 .editor.on{transform:translate(-50%,-50%) scale(1);opacity:1}
 .editor .lights{align-self:flex-start;padding:13px 14px}
 .ed-stage{position:relative;margin-top:2px;border-radius:10px;overflow:hidden;box-shadow:0 26px 50px -20px rgba(0,0,0,.8)}
@@ -152,7 +305,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .ed-bar .sz span{border-radius:50%;background:#fff;opacity:.6}
 .ed-bar .sz span.on{opacity:1;box-shadow:0 0 0 4px rgba(255,255,255,.18)}
 .ed-bar .done{background:#fff;color:#111;font-size:13px;font-weight:600;border-radius:999px;padding:7px 16px;margin-left:6px}
-.ed-copied{position:absolute;right:14px;top:11px;display:flex;align-items:center;gap:6px;color:#fff;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.25);opacity:0;transform:scale(.6);transition:all .4s var(--spring)}
+.ed-copied{position:absolute;right:14px;top:11px;display:flex;align-items:center;gap:6px;color:#fff;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.25);opacity:0;transform:scale(.6);}
 .ed-copied.on{opacity:1;transform:none}
 .shotbox{position:relative;overflow:hidden;flex:none}
 
@@ -194,7 +347,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .tools-list i{font-size:17px}
 
 /* 3. Paste anywhere: a full-width desk of destinations */
-.p-paste{background:url("keys-sky.jpg") center 35%/cover,#c9d2f6}
+.p-paste{background:url("keys-sky.webp") center 35%/cover,#c9d2f6}
 .p-several .plate,.p-paste .plate{box-shadow:inset 0 0 0 .5px rgba(255,255,255,.32),0 12px 24px -12px rgba(20,22,50,.5)}
 .dest{position:absolute;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 0 0 .5px rgba(0,0,0,.14),0 30px 60px -30px rgba(20,25,70,.45);color:#1d1d1f}
 .dest .bar{height:42px;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:600;color:#333}
@@ -227,7 +380,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .atts .slot .badge,.att3 .slot .badge,.d-board .slot .badge{width:17px;height:17px;left:4px;top:4px;font-size:9.5px}
 
 /* ---------- One shortcut ---------- */
-.keys{position:relative;margin-top:clamp(120px,14vw,190px);min-height:100vh;min-height:100dvh;display:grid;place-items:center;text-align:center;padding:120px 20px;background:url("keys-sky.jpg") center 40%/cover,#a8b9f2;isolation:isolate;overflow:hidden}
+.keys{position:relative;margin-top:clamp(120px,14vw,190px);min-height:100vh;min-height:100dvh;display:grid;place-items:center;text-align:center;padding:120px 20px;background:url("keys-sky.webp") center 40%/cover,#a8b9f2;isolation:isolate;overflow:hidden}
 .keys::before,.keys::after{content:"";position:absolute;inset:0 0 auto;height:24%;background:linear-gradient(var(--bg),transparent);z-index:-1}
 .keys::after{inset:auto 0 0;background:linear-gradient(transparent,var(--bg))}
 .caps{position:relative;display:flex;justify-content:center;gap:clamp(10px,1.6vw,18px);margin-bottom:48px}
@@ -242,7 +395,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 
 /* ---------- Library ---------- */
 .library{padding-top:clamp(110px,12vw,160px)}
-.lib-stage{position:relative;margin-top:56px;border-radius:24px;overflow:hidden;aspect-ratio:16/10;background:url("flow-sky.jpg") center/cover,#c9d2f6;display:grid;place-items:center}
+.lib-stage{position:relative;margin-top:56px;border-radius:24px;overflow:hidden;aspect-ratio:16/10;background:url("flow-sky.webp") center/cover,#c9d2f6;display:grid;place-items:center}
 .libwin{width:min(78%,720px);border-radius:14px;overflow:hidden;background:rgba(250,250,252,.92);backdrop-filter:blur(30px) saturate(1.5);font-family:var(--mac);color:#1d1d1f;transform-origin:50% 60%;box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 50px 90px -40px rgba(20,25,70,.6)}
 .lw-top{height:48px;display:flex;align-items:center;padding:0 14px;gap:14px;border-bottom:1px solid rgba(0,0,0,.06)}
 .lights{display:flex;gap:8px}.lights span{width:12px;height:12px;border-radius:50%;background:#ff5f57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)}.lights span:nth-child(2){background:#febc2e}.lights span:nth-child(3){background:#28c840}
@@ -264,7 +417,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 
 /* ---------- Final: download on the painted landscape ---------- */
 .final{position:relative;margin-top:clamp(120px,14vw,180px);min-height:max(820px,112vh);overflow:hidden;isolation:isolate;text-align:center}
-.final .land{position:absolute;inset:0;z-index:-2;background:url("footer-landscape.jpg") center bottom/cover no-repeat;transform-origin:50% 100%}
+.final .land{position:absolute;inset:0;z-index:-2;background:url("footer-landscape.webp") center bottom/cover no-repeat;transform-origin:50% 100%}
 .final::before{content:"";position:absolute;inset:0 0 auto;height:46%;background:linear-gradient(var(--bg) 30%,transparent);z-index:-1}
 .final .content{position:relative;padding-top:clamp(40px,6vw,80px)}
 .final .icon-wrap{position:relative;width:120px;height:120px;margin:0 auto}
@@ -410,7 +563,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 /* ---------- Motion moment: the Desktop pile (on the lake wallpaper) ---------- */
 .pile{position:relative;height:300vh;margin-top:0}
 .pile-stage{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;background:var(--bg)}
-.pile-screen{position:absolute;inset:0;overflow:hidden;isolation:isolate;background:url("wallpaper.jpg") center 55%/cover,#9fb3f1}
+.pile-screen{position:absolute;inset:0;overflow:hidden;isolation:isolate;background:url("wallpaper.webp") center 55%/cover,#9fb3f1}
 .pile-notch{position:absolute;left:50%;top:0;width:clamp(120px,13vw,200px);height:30px;background:#050506;border-radius:0 0 12px 12px;z-index:7;transform:translate(-50%,-102%);transition:transform .6s cubic-bezier(.22,1.2,.36,1)}
 .pile.locked .pile-notch{transform:translate(-50%,0)}
 .pile-notch::after{content:"";position:absolute;left:50%;top:11px;width:6px;height:6px;border-radius:50%;background:#1a1b22;transform:translateX(-50%);box-shadow:inset 0 0 0 1px #262833}
@@ -433,12 +586,12 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .keys-inline kbd{display:inline-grid;place-items:center;min-width:1.75em;height:1.75em;padding:0 .4em;border-radius:9px;font:600 .82em var(--mac);color:var(--ink);background:linear-gradient(#fff,#f3f4f7);box-shadow:0 0 0 1px rgba(21,22,27,.1),0 2px 0 #d5d8e2,0 6px 12px -6px rgba(30,40,90,.3)}
 .usecase .mac-frame{margin-top:52px;position:relative;width:100%;aspect-ratio:16/10;border-radius:22px;overflow:hidden;
   box-shadow:0 0 0 1px rgba(20,21,40,.1),0 0 0 9px #16171c,0 0 0 10px #3a3b42,0 70px 110px -50px rgba(40,50,110,.55)}
-.mac{position:absolute;left:0;top:0;width:1280px;height:800px;transform-origin:0 0;font:13px/1.35 var(--mac);color:#1d1d1f;user-select:none;background:url("wallpaper.jpg") center 40%/cover,#9fb3f1}
+.mac{position:absolute;left:0;top:0;width:1280px;height:800px;transform-origin:0 0;font:13px/1.35 var(--mac);color:#1d1d1f;user-select:none;background:url("wallpaper.webp") center 40%/cover,#9fb3f1}
 .usecase .mac-wrap{padding:10px}
 
 
 /* ---------- Grab three: tray to composer, on the clouds ---------- */
-.p-several{background:url("flow-sky.jpg") center 40%/cover,#c9d2f6}
+.p-several{background:url("flow-sky.webp") center 40%/cover,#c9d2f6}
 .p-several .overlay{position:absolute;left:clamp(24px,4vw,52px);top:clamp(24px,4vw,52px);z-index:3;max-width:380px}
 .p-several .overlay h2{font-size:clamp(34px,3.8vw,52px);color:#111218}
 .p-several .overlay .lede{color:#2b2d3a}
@@ -458,7 +611,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .kv1 span{font:600 17px var(--mac);min-width:44px;height:44px;padding:0 11px;display:grid;place-items:center;border-radius:11px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.1),0 4px 0 rgba(0,0,0,.12),0 16px 30px -14px rgba(0,0,0,.5)}
 
 /* ---------- Mark up: wide warm panel, editor plus the reply it earns ---------- */
-.p-markup{background:url("hero-sky.jpg") center 88%/cover,#f2c9b4}
+.p-markup{background:url("hero-sky.webp") center 88%/cover,#f2c9b4}
 .reply{position:absolute;width:300px;border-radius:16px;background:#fff;padding:14px;box-shadow:0 0 0 .5px rgba(0,0,0,.1),0 30px 60px -28px rgba(40,30,70,.5);font-family:var(--mac);color:#1d1d1f;opacity:0}
 .reply .who{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700}
 .reply .who i{width:28px;height:28px;border-radius:8px;background:#9b6bff;color:#fff;display:grid;place-items:center;font-style:normal;font-size:13px}
@@ -525,7 +678,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .fgrid a,.fgrid .kb{display:flex;align-items:center;gap:10px;font-size:14.5px;color:var(--ink);padding:5px 0}
 .fgrid a:hover{color:var(--blue)}
 .fgrid .kb kbd{font-size:11.5px;padding:2px 6px}
-.land2{position:relative;height:max(300px,34vw);margin-top:0;background:url("footer-landscape.jpg") center 92%/cover no-repeat}
+.land2{position:relative;height:max(300px,34vw);margin-top:0;background:url("footer-landscape.webp") center 92%/cover no-repeat}
 .land2::before{content:"";position:absolute;inset:0 0 auto;height:45%;background:linear-gradient(var(--bg),transparent)}
 .land2 .legal{position:absolute;inset:auto 0 18px;color:#fff;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.4)}
 .land2 .legal .wrap{display:flex;justify-content:space-between}
@@ -544,7 +697,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 
 /* Final: the whole section sits on the painted landscape, footer in a frosted panel on the hills */
 .final3{position:relative;isolation:isolate;margin-top:clamp(100px,12vw,160px);min-height:max(820px,104vh);display:flex;flex-direction:column;text-align:center;
-  background:url("footer-landscape.jpg") center bottom/cover no-repeat,#c9d6f5;padding:clamp(110px,13vh,170px) 0 22px}
+  background:url("footer-landscape.webp") center bottom/cover no-repeat,#c9d6f5;padding:clamp(110px,13vh,170px) 0 22px}
 .final3::before{content:"";position:absolute;inset:0 0 auto;height:56%;background:linear-gradient(var(--bg) 0%,var(--bg) 14%,rgba(251,251,253,.86) 28%,rgba(251,251,253,.5) 44%,rgba(251,251,253,.16) 62%,rgba(251,251,253,0) 80%);z-index:-1;pointer-events:none}
 .appicon{position:relative;display:inline-block;width:72px;height:72px;vertical-align:top}
 .appicon img,.appicon svg{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -553,6 +706,10 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .hero-icon{margin:0 auto 22px;filter:drop-shadow(0 18px 22px rgba(30,45,110,.28))}
 .final3 h2{font-size:clamp(56px,8vw,112px);line-height:1;letter-spacing:-.055em;margin:26px auto 0;color:#111218}
 .final3 .cta p{color:var(--ink2);font-size:clamp(17px,1.5vw,20px);margin:18px auto 30px}
+.ctas{display:flex;align-items:center;justify-content:center;gap:10px 26px;flex-wrap:wrap}
+.gh{display:inline-flex;align-items:center;gap:8px;padding:10px 4px;font-size:15px;font-weight:500;color:var(--ink);opacity:.66;transition:opacity .2s}
+.gh:hover,.gh:focus-visible{opacity:1}
+.gh i{font-size:19px}
 .final3 .cta small{display:block;margin-top:14px;color:#4a4d5a;font-size:13.5px}
 .fwrap{margin-top:auto;padding-top:clamp(56px,8vh,96px);width:100%}
 .final3::after{content:"";position:absolute;inset:auto 0 0;height:42%;background:linear-gradient(rgba(18,24,44,0),rgba(18,24,44,.24) 40%,rgba(18,24,44,.42));z-index:-1;pointer-events:none}
@@ -605,10 +762,10 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 <section class="hero" id="top">
   <div class="sky" id="sky" aria-hidden="true"></div>
   <div class="wrap">
-    <div class="rv hero-icon"><span class="appicon " data-peek><img src="peek-icon-noeyes.png" alt=""><svg viewBox="0 0 512 512" aria-hidden="true"><g fill="#fff"><rect class="eye" x="230.5" y="204.5" width="25.5" height="83.5" rx="12.75"/><rect class="eye" x="273.5" y="204.5" width="25.5" height="83.5" rx="12.75"/></g></svg></span></div>
+    <div class="rv hero-icon"><span class="appicon " data-peek><img src="peek-icon-noeyes.webp" alt=""><svg viewBox="0 0 512 512" aria-hidden="true"><g fill="#fff"><rect class="eye" x="230.5" y="204.5" width="25.5" height="83.5" rx="12.75"/><rect class="eye" x="273.5" y="204.5" width="25.5" height="83.5" rx="12.75"/></g></svg></span></div>
     <h1 class="rv">The screenshot app your Mac deserves</h1>
     <p class="sub rv">Every screenshot goes straight to your clipboard. Paste it anywhere, and never dig through your Desktop again.</p>
-    <div class="rv"><a class="btn lg" href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download><i class="ph-fill ph-apple-logo"></i><span class="btn-label" data-btn-01="stagger">Download for Mac</span></a></div>
+    <div class="rv ctas"><a class="btn lg" href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download><i class="ph-fill ph-apple-logo"></i><span class="btn-label" data-btn-01="stagger">Download for Mac</span></a><a class="gh" href="https://github.com/nickwechols/peek"><i class="ph ph-github-logo"></i>View on GitHub</a></div>
   </div>
   <div class="hqclip" aria-hidden="true"><div class="hq" id="hq"><span id="hqs"></span></div></div>
   <div class="hcur" id="hcur"></div>
@@ -711,7 +868,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
                 <div class="ptab"><i class="ph ph-house"></i><i class="ph ph-plus-circle"></i><i class="ph-fill ph-user on"></i></div>
               </div></div>
 
-            <div class="cursor-friend" id="friend"><i class="ph-fill ph-cursor"></i><span>Jules</span></div>
+            <div class="cursor-friend" id="friend"><i class="ph-fill ph-cursor"></i><span>Jack</span></div>
             <div class="toolbar"><span class="on"><i class="ph ph-cursor"></i></span><span><i class="ph ph-hash"></i></span><span><i class="ph ph-square"></i></span><span><i class="ph ph-pen-nib"></i></span><span><i class="ph ph-text-t"></i></span><span><i class="ph ph-chat-circle"></i></span><span class="sp2"></span><span><i class="ph ph-code"></i></span></div>
           </div>
 
@@ -731,7 +888,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
         <div class="win chat" id="chat">
           <div class="chat-top"><div class="lights"><span></span><span></span><span></span></div><div class="t">Claude</div></div>
           <div class="thread" id="thread">
-            <div class="greet" id="greet"><img class="cmark" src="claude-mark.png" alt="">Back at it, Nick</div>
+            <div class="greet" id="greet"><img class="cmark" src="claude-mark.webp" alt="">Back at it, Nick</div>
           </div>
           <div class="composer" id="composer">
             <div class="att" id="att"></div>
@@ -760,7 +917,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
       <h2>Grab three. Paste three.</h2>
       <p class="lede">Hold <kbd class="cmdk">⌘</kbd> and click shots in order. One paste drops them all in.</p>
     </div>
-    <div class="scene" id="sc1" style="--ar:1000/560" data-w="1000" data-h="560">
+    <div class="scene" id="sc1" style="--ar:1000/560" data-w="1000" data-h="560" data-m="70 225 905 335">
       <div class="inner" style="width:1000px;height:560px">
         <div class="tray2" id="t2" style="left:300px;top:380px">
           <div class="tray-head"><span class="lab">3 copied</span><b><i class="ph-bold ph-copy" style="width:auto"></i>Copy all</b></div>
@@ -788,7 +945,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
     <p class="lede rv">Arrows, boxes and numbered steps. Press Return and the marked-up shot is already copied.</p>
   </div>
   <div class="panel p-markup rv-panel fitbox" style="--hh:340px;--ar:1.774">
-    <div class="scene" id="sc2" style="--ar:1100/620" data-w="1100" data-h="620">
+    <div class="scene" id="sc2" style="--ar:1100/620" data-w="1100" data-h="620" data-m="30 20 1040 572">
       <div class="inner" style="width:1100px;height:620px">
         <!-- Peek's editor, as it ships: dark frosted window, glass toolbar -->
         <div class="mk-ed" id="mkEd">
@@ -806,9 +963,9 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
           <div class="sl-top"><div class="lights"><span></span><span></span><span></span></div><div class="sl-search"><i class="ph ph-magnifying-glass"></i>Search Come Thru</div></div>
           <div class="sl-head"><b># ios-feedback</b><span class="sl-mem"><i style="--c:#9b6bff">J</i><i style="--c:#ff8a5c">N</i>4</span></div>
           <div class="sl-feed" id="mkFeed">
-            <div class="sl-msg"><i class="sl-av" style="--c:#9b6bff">J</i><div><div class="sl-who">Jules <span>10:42 AM</span></div><p>Invite sheet is on TestFlight. Anything feel off?</p></div></div>
+            <div class="sl-msg"><i class="sl-av" style="--c:#9b6bff">J</i><div><div class="sl-who">Jack <span>10:42 AM</span></div><p>Invite sheet is on TestFlight. Anything feel off?</p></div></div>
             <div class="sl-msg" id="mkMe"><i class="sl-av" style="--c:#ff8a5c">N</i><div><div class="sl-who">Nick <span>10:44 AM</span></div><div class="sl-img" id="mkImg"></div><p>1 should default to Everyone. 2 sits on the home bar.</p></div></div>
-            <div class="sl-msg" id="mkJules"><i class="sl-av" style="--c:#9b6bff">J</i><div><div class="sl-who">Jules <span>10:45 AM</span></div><p>Got it, both fixed in the next build.</p><span class="sl-react" id="mkReact"><i class="ph-fill ph-check-circle"></i>1</span></div></div>
+            <div class="sl-msg" id="mkJack"><i class="sl-av" style="--c:#9b6bff">J</i><div><div class="sl-who">Jack <span>10:45 AM</span></div><p>Got it, both fixed in the next build.</p><span class="sl-react" id="mkReact"><i class="ph-fill ph-check-circle"></i>1</span></div></div>
           </div>
           <div class="sl-comp"><div class="sl-ph">Message #ios-feedback</div><div class="sl-tools"><i class="ph ph-plus-circle"></i><i class="ph ph-text-aa"></i><i class="ph ph-smiley"></i><i class="ph ph-at"></i><span class="sl-send"><i class="ph-fill ph-paper-plane-right"></i></span></div></div>
           <div class="kv1 mk-kv" id="mkKv"><span>⌘</span><span>V</span></div>
@@ -826,11 +983,11 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
     <p class="lede rv">Slack, Figma, Linear, your AI of choice, the group chat. Your shots arrive in the order you picked.</p>
   </div>
   <div class="panel p-paste rv-panel fitbox" style="--hh:300px;--ar:2.4">
-    <div class="scene" id="sc3" style="--ar:1200/500" data-w="1200" data-h="500">
+    <div class="scene" id="sc3" style="--ar:1200/500" data-w="1200" data-h="500" data-m="34 8 1132 474">
       <div class="inner" style="width:1200px;height:500px">
         <div class="dest d-chat" id="dChat" style="left:40px;top:24px;width:340px;height:380px;background:#faf9f5">
           <div class="bar" style="background:#faf9f5;border-color:#efece3"><div class="lights"><span></span><span></span><span></span></div><div class="t" style="color:#5c5a52">Claude</div></div>
-          <div style="text-align:center;margin-top:70px;font:400 20px 'Iowan Old Style','Palatino',Georgia,serif;color:#1f1e1d"><img class="cmark" src="claude-mark.png" alt="" style="width:20px;height:20px;margin-right:7px">Back at it, Nick</div>
+          <div style="text-align:center;margin-top:70px;font:400 20px 'Iowan Old Style','Palatino',Georgia,serif;color:#1f1e1d"><img class="cmark" src="claude-mark.webp" alt="" style="width:20px;height:20px;margin-right:7px">Back at it, Nick</div>
           <div class="ccomp" id="ccomp"><div class="atts" id="ccAtts"></div><div class="cph">How can I help you today?</div><div class="crow3"><span class="cplus"><i class="ph ph-plus"></i></span><span class="cmodel">Opus 5.5</span><span class="csend" id="ccSend"><i class="ph-bold ph-arrow-up"></i></span></div></div>
         </div>
         <div class="dest d-board" id="dBoard" style="left:430px;top:24px;width:340px;height:380px">
@@ -856,11 +1013,11 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 
 <section class="final3" id="final">
   <div class="cta wrap">
-    <div class="rv"><span class="appicon lg" data-peek><img src="peek-icon-noeyes.png" alt="Peek app icon"><svg viewBox="0 0 512 512" aria-hidden="true"><g fill="#fff"><rect class="eye" x="230.5" y="204.5" width="25.5" height="83.5" rx="12.75"/><rect class="eye" x="273.5" y="204.5" width="25.5" height="83.5" rx="12.75"/></g></svg></span></div>
+    <div class="rv"><span class="appicon lg" data-peek><img src="peek-icon-noeyes.webp" alt="Peek app icon"><svg viewBox="0 0 512 512" aria-hidden="true"><g fill="#fff"><rect class="eye" x="230.5" y="204.5" width="25.5" height="83.5" rx="12.75"/><rect class="eye" x="273.5" y="204.5" width="25.5" height="83.5" rx="12.75"/></g></svg></span></div>
     <h2 class="rv">Peek is free.</h2>
     <p class="rv">Your Mac was expensive. This part isn't.</p>
-    <div class="rv"><a class="btn lg" href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download><i class="ph-fill ph-apple-logo"></i><span class="btn-label" data-btn-01="stagger">Download for Mac</span></a></div>
-    <small class="rv">macOS 13 or later, Apple silicon and Intel. Free and <a href="https://github.com/nickwechols/peek" style="text-decoration:underline;text-underline-offset:3px">open source</a>.</small>
+    <div class="rv ctas"><a class="btn lg" href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download><i class="ph-fill ph-apple-logo"></i><span class="btn-label" data-btn-01="stagger">Download for Mac</span></a><a class="gh" href="https://github.com/nickwechols/peek"><i class="ph ph-github-logo"></i>View on GitHub</a></div>
+    <small class="rv">macOS 13 or later, Apple silicon and Intel. Free and open source.</small>
   </div>
   <div class="wrap fwrap">
     <div class="fglass">
@@ -875,6 +1032,8 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
   </div>
 </section>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" integrity="sha384-g4NTh/Iv5PPU4xPyhEWqPcwtNXOvdaDI8LLnyYfyNZOjKJeYQyjzQ9X5275eBjpt" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" integrity="sha384-Z3REaz79l2IaAZqJsSABtTbhjgOUYyV3p90XNnAPCSHg3EMTz1fouunq9WZRtj3d" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 /* Download buttons: split the label into letters for the staggered slide */
 (function button01(scope = document){
@@ -896,7 +1055,14 @@ const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const mac = $('#mac'), frame = $('#macFrame');
 function fitAll(){
   mac.style.transform = `scale(${frame.clientWidth/1280})`;
-  $$('.scene').forEach(s => s.firstElementChild.style.transform = `scale(${s.clientWidth / +s.dataset.w})`);
+  /* phones: each demo crops to the area where its story happens, so it reads larger */
+  const phone = matchMedia('(max-width:600px)').matches;
+  $$('.scene').forEach(s => {
+    const m = phone && s.dataset.m ? s.dataset.m.split(' ').map(Number) : null;
+    s.style.aspectRatio = m ? `${m[2]}/${m[3]}` : '';
+    const k = s.clientWidth / (m ? m[2] : +s.dataset.w);
+    s.firstElementChild.style.transform = m ? `scale(${k}) translate(${-m[0]}px,${-m[1]}px)` : `scale(${k})`;
+  });
 }
 fitAll(); addEventListener('resize', fitAll);
 
@@ -921,7 +1087,8 @@ function thumb(k, w = 150, h = 96, n = ''){
 const press = (tl, el, t) => tl.to(el, {scale:.8, duration:.06}, t).to(el, {scale:1, duration:.08}, t + .06);
 function autoplay(trigger, tl){
   /* every visit starts the story from frame one; off screen it rests on that first frame */
-  const reset = () => tl.pause(0), start = () => tl.restart();
+  /* positions are measured fresh on every visit, so a layout change never sends a shot off course */
+  const reset = () => tl.pause(0), start = () => tl.invalidate().restart();
   const st = ScrollTrigger.create({trigger, start:'top 60%', end:'bottom 25%', onEnter:start, onEnterBack:start, onLeave:reset, onLeaveBack:reset});
   if (!st.isActive) reset();
   return st;
@@ -948,7 +1115,7 @@ function buildHero(){
   const ghosts = R.map(r => { const g = document.createElement('div'); g.className = 'ghost'; g.style.cssText = `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px`; g.append(crop(r.w, r)); hero.append(g); return g; });
   const tl = gsap.timeline({paused:true, repeat:-1, repeatDelay:.9, defaults:{ease:'power2.inOut'}});
   tl.set(hq, {opacity:0}, 0).set(hcur, {opacity:0, left:W*.62, top:H*.8}, 0).set(htray, {autoAlpha:0, y:30, scale:.92}, 0).set(hhead, {opacity:0}, 0).set(hlab, {textContent:'Copied'}, 0);
-  thumbs.forEach(t => tl.set(t, {width:0, marginLeft:-8, autoAlpha:0, scale:.6}, 0).set(t.querySelector('.rg'), {opacity:0}, 0));
+  thumbs.forEach(t => tl.set(t, {width:0, marginLeft:-8, autoAlpha:0, scale:.6}, 0).set(t.querySelector(':scope > .rg'), {opacity:0}, 0));
   ghosts.forEach(g => tl.set(g, {opacity:0, x:0, y:0, scale:1}, 0));
   R.forEach((r, i) => {
     const t = .3 + i*2.3;
@@ -963,10 +1130,10 @@ function buildHero(){
       .to(ghosts[i], {x:W/2 - (r.x + r.w/2), y:trayY - (r.y + r.h/2), scale:126 / r.w, opacity:0, duration:.7, ease:'power3.inOut'}, t + 1.5);
     if (i === 0) tl.to(htray, {autoAlpha:1, y:0, scale:1, duration:.55, ease:'back.out(1.5)'}, t + 1.6);
     tl.to(thumbs[i], {width:126, marginLeft:0, autoAlpha:1, scale:1, duration:.5, ease:'back.out(1.7)'}, t + 1.95)
-      .to(thumbs[i].querySelector('.rg'), {opacity:1, duration:.15}, t + 2.05)
-      .fromTo(thumbs[i].querySelector('.ok'), {opacity:0, scale:.3}, {opacity:1, scale:1, duration:.28, ease:'back.out(2.2)'}, t + 2.1)
-      .to(thumbs[i].querySelector('.ok'), {opacity:0, duration:.2}, t + 2.6);
-    if (i) tl.to(thumbs[i-1].querySelector('.rg'), {opacity:0, duration:.15}, t + 2.05);
+      .to(thumbs[i].querySelector(':scope > .rg'), {opacity:1, duration:.15}, t + 2.05)
+      .fromTo(thumbs[i].querySelector(':scope > .ok'), {opacity:0, scale:.3}, {opacity:1, scale:1, duration:.28, ease:'back.out(2.2)'}, t + 2.1)
+      .to(thumbs[i].querySelector(':scope > .ok'), {opacity:0, duration:.2}, t + 2.6);
+    if (i) tl.to(thumbs[i-1].querySelector(':scope > .rg'), {opacity:0, duration:.15}, t + 2.05);
   });
   tl.set(hlab, {textContent:'3 shots, all on your clipboard'}, 7.3).to(hhead, {opacity:1, duration:.3}, 7.3)
     .to(htray, {autoAlpha:0, y:20, duration:.5, ease:'power2.in'}, 9.4);
@@ -977,7 +1144,7 @@ function buildHero(){
 /* ---------- Motion moment: screenshots pile up on the Desktop, then Peek clears them ---------- */
 const files = $('#files'), pplate = $('#pplate'), ptray = $('#ptray');
 gsap.set(ptray, {xPercent:-50});
-[1, 2, 3].forEach((k, i) => { const im = new Image(118, 76); im.src = `desk/tray-${k}.webp`; im.alt = ''; im.decoding = 'async'; im.style.cssText = 'display:block;width:118px;height:76px;object-fit:cover'; const t = thumb(im, 118, 76, i+1); pplate.append(t); gsap.set(t.querySelectorAll('.rg,.n'), {opacity:1}); });
+[1, 2, 3].forEach((k, i) => { const im = new Image(118, 76); im.src = `desk/tray-${k}.webp`; im.alt = ''; im.decoding = 'async'; im.style.cssText = 'display:block;width:118px;height:76px;object-fit:cover;border-radius:12px'; const t = thumb(im, 118, 76, i+1); pplate.append(t); gsap.set(t.querySelectorAll(':scope > .rg, :scope > .n'), {opacity:1}); });
 let pileTl;
 function buildPile(){
   if (pileTl){ pileTl.scrollTrigger && pileTl.scrollTrigger.kill(); pileTl.kill(); }
@@ -1028,22 +1195,22 @@ const mg = document.createElement('div'); mg.className = 'grid';
 mg.append(shot(P.home, 84, 112, 'fit', '#f0eee6', .92), shot(P.invite, 84, 112, 'fit', '#f0eee6', .92));
 me.append(mg); me.insertAdjacentHTML('beforeend', `<div class="txt">${msg}</div>`); thread.append(me);
 const ai = document.createElement('div'); ai.className = 'ai';
-ai.innerHTML = '<span class="mark"><img class="cmark" src="claude-mark.png" alt="" style="width:16px;height:16px;margin:0"></span><div>Home uses pill buttons, but the sheet’s Send is a rounded rectangle. Make Send a pill in the same orange and the two screens will read as one app.</div>';
+ai.innerHTML = '<span class="mark"><img class="cmark" src="claude-mark.webp" alt="" style="width:16px;height:16px;margin:0"></span><div>Home uses pill buttons, but the sheet’s Send is a rounded rectangle. Make Send a pill in the same orange and the two screens will read as one app.</div>';
 thread.append(ai);
 const box = el => { const b = boxIn(el, mac); return {x:b.x - 14, y:b.y - 30, w:b.w + 28, h:b.h + 44}; };
 const FA = box(P.home), FB = box(P.invite);
 const lyr = [...document.querySelectorAll('#fig .lp .lr')], lyrHome = lyr.find(l => l.textContent.trim() === 'Home'), lyrInv = lyr.find(l => l.textContent.trim() === 'Invite sheet');
 const szUp = () => { sz.textContent = Math.round(mq.offsetWidth*2)+' × '+Math.round(mq.offsetHeight*2); };
 const popIn = (tl, T, t) => tl.to(T, {width:150, marginLeft:0, autoAlpha:1, scale:1, duration:.5, ease:'back.out(1.6)'}, t)
-  .to(T.querySelector('.rg'), {opacity:1, duration:.2}, t + .15)
-  .fromTo(T.querySelector('.ok'), {opacity:0, scale:.3}, {opacity:1, scale:1, duration:.3, ease:'back.out(2.2)'}, t + .2)
-  .to(T.querySelector('.ok'), {opacity:0, duration:.2}, t + .8);
+  .to(T.querySelector(':scope > .rg'), {opacity:1, duration:.2}, t + .15)
+  .fromTo(T.querySelector(':scope > .ok'), {opacity:0, scale:.3}, {opacity:1, scale:1, duration:.3, ease:'back.out(2.2)'}, t + .2)
+  .to(T.querySelector(':scope > .ok'), {opacity:0, duration:.2}, t + .8);
 const SH = 2.15; /* everything after the second capture shifts by this */
 const tl0 = gsap.timeline({paused:true, repeat:-1, repeatDelay:.8, defaults:{ease:'power2.inOut'}});
 tl0.set(cur, {left:780, top:640}, 0).set(arrow, {autoAlpha:1}, 0).set(cross, {autoAlpha:0}, 0)
   .set(mq, {opacity:0, left:FA.x, top:FA.y, width:0, height:0}, 0)
   .set(tray, {autoAlpha:0, y:46, scale:.84}, 0)
-  .set([TA, TB], {width:0, marginLeft:-8, autoAlpha:0, scale:.6}, 0).set([TA.querySelector('.rg'), TB.querySelector('.rg')], {opacity:0}, 0).set(trayHead, {opacity:0}, 0)
+  .set([TA, TB], {width:0, marginLeft:-8, autoAlpha:0, scale:.6}, 0).set([TA.querySelector(':scope > .rg'), TB.querySelector(':scope > .rg')], {opacity:0}, 0).set(trayHead, {opacity:0}, 0)
   .call(() => { lyrHome.classList.add('sel'); lyrInv.classList.remove('sel'); }, null, 0)
   .set(att, {display:'none'}, 0).set(att.children, {opacity:0, scale:.4}, 0)
   .set(typed.querySelector('.phd'), {opacity:1}, 0).set(typed.querySelector('.msg'), {clipPath:'inset(0 100% 0 0)'}, 0)
@@ -1136,7 +1303,7 @@ autoplay('#macFrame', tl0);
 const sc1 = $('#sc1 .inner'), t2 = $('#t2'), t2plate = $('#t2plate'), c1 = $('#c1'), c1i = c1.querySelector('i'), c1mod = c1.querySelector('.mod');
 const cmp = $('#cmp'), kv1 = $('#kv1'), slots = [...$('#cmpSlots').children], cmpGo = $('#cmpGo');
 gsap.set(t2, {xPercent:-50}); gsap.set(c1i, {transformOrigin:'4px 2px'});
-const order = ['invite','home','profile'], pasteN = {home:1, invite:2, profile:3}, byN = ['home','invite','profile'];
+const order = ['home','invite','profile'], pasteN = {home:1, invite:2, profile:3}, byN = ['home','invite','profile'];
 const T2 = {};
 order.forEach(k => { const t = thumb(k, 132, 86, pasteN[k]); t2plate.append(t); T2[k] = t; });
 const flies = byN.map((k, i) => { const f = document.createElement('div'); f.className = 'fly'; f.append(shot(P[k], 92, 62, 'fill')); f.insertAdjacentHTML('beforeend', `<span class="badge">${i+1}</span>`); sc1.insertBefore(f, kv1); return f; });
@@ -1145,11 +1312,11 @@ tl1.set(t2, {autoAlpha:1, y:0}, 0).set(t2.querySelector('.tray-head'), {opacity:
    .set(kv1, {opacity:0}, 0).set(cmpGo, {backgroundColor:'#e9e9ec'}, 0).set(cmp, {y:0, boxShadow:'0 0 0 .5px rgba(0,0,0,.12),0 30px 60px -28px rgba(20,25,70,.5)'}, 0)
    .set(flies, {opacity:0}, 0);
 order.forEach((k, i) => {
-  tl1.set(T2[k], {width:0, marginLeft:-8, autoAlpha:0, scale:.6}, 0).set(T2[k].querySelectorAll('.rg,.n'), {opacity:0}, 0);
+  tl1.set(T2[k], {width:0, marginLeft:-8, autoAlpha:0, scale:.6}, 0).set(T2[k].querySelectorAll(':scope > .rg, :scope > .n'), {opacity:0}, 0);
   const t = .3 + i*.55;
   tl1.to(T2[k], {width:132, marginLeft:0, autoAlpha:1, scale:1, duration:.5, ease:'back.out(1.7)'}, t)
-     .fromTo(T2[k].querySelector('.ok'), {opacity:0, scale:.3}, {opacity:1, scale:1, duration:.25, ease:'back.out(2.2)'}, t + .15)
-     .to(T2[k].querySelector('.ok'), {opacity:0, duration:.2}, t + .55);
+     .fromTo(T2[k].querySelector(':scope > .ok'), {opacity:0, scale:.3}, {opacity:1, scale:1, duration:.25, ease:'back.out(2.2)'}, t + .15)
+     .to(T2[k].querySelector(':scope > .ok'), {opacity:0, duration:.2}, t + .55);
 });
 tl1.to(c1mod, {opacity:1, duration:.2}, 2.1);
 const thumbXY = k => ({x: 300 - t2.offsetWidth/2 + T2[k].offsetLeft, y: 380 + T2[k].offsetTop});
@@ -1157,8 +1324,8 @@ byN.forEach((k, i) => {
   const t = 2.2 + i*.5;
   tl1.to(c1, {left:() => thumbXY(k).x + 70, top:() => thumbXY(k).y + 46, duration:.35}, t);
   press(tl1, c1i, t + .36);
-  tl1.to(T2[k].querySelector('.rg'), {opacity:1, duration:.12}, t + .4)
-     .fromTo(T2[k].querySelector('.n'), {opacity:0, scale:.3}, {opacity:1, scale:1, duration:.3, ease:'back.out(2.4)'}, t + .4);
+  tl1.to(T2[k].querySelector(':scope > .rg'), {opacity:1, duration:.12}, t + .4)
+     .fromTo(T2[k].querySelector(':scope > .n'), {opacity:0, scale:.3}, {opacity:1, scale:1, duration:.3, ease:'back.out(2.4)'}, t + .4);
 });
 tl1.to(t2.querySelector('.tray-head'), {opacity:1, duration:.3}, 3.8).to(c1mod, {opacity:0, duration:.2}, 3.9)
    .to(c1, {left:() => cmp.offsetLeft + 200, top:() => cmp.offsetTop + 96, duration:.55}, 3.9);
@@ -1166,10 +1333,11 @@ press(tl1, c1i, 4.5);
 tl1.to(cmp, {boxShadow:'0 0 0 .5px rgba(0,0,0,.12),0 44px 80px -30px rgba(20,25,70,.6)', duration:.3}, 4.5)
    .set(kv1, {left:() => cmp.offsetLeft + 150, top:() => cmp.offsetTop - 60}, 4.55)
    .fromTo(kv1, {opacity:0, scale:.7, y:8}, {opacity:1, scale:1, y:0, duration:.3, ease:'back.out(2)'}, 4.6);
+/* a set then a to (no fromTo): stays correct on every repeat of the loop */
 flies.forEach((f, i) => {
-  const k = byN[i];
-  tl1.fromTo(f, {left:() => thumbXY(k).x + 20, top:() => thumbXY(k).y + 12, opacity:1, scale:1.1},
-                {left:() => cmp.offsetLeft + slots[i].offsetLeft, top:() => cmp.offsetTop + slots[i].offsetTop, scale:1, duration:.6, ease:'power3.inOut'}, 4.95 + i*.16);
+  const k = byN[i], t = 4.95 + i*.16;
+  tl1.set(f, {left:() => thumbXY(k).x + 20, top:() => thumbXY(k).y + 12, opacity:1, scale:1.1}, t)
+     .to(f, {left:() => cmp.offsetLeft + slots[i].offsetLeft, top:() => cmp.offsetTop + slots[i].offsetTop, scale:1, duration:.6, ease:'power3.inOut'}, t);
 });
 tl1.to(kv1, {opacity:0, duration:.2}, 5.7).to(cmpGo, {backgroundColor:'#15161b', duration:.2}, 5.8)
    .to(cmp, {y:0, duration:.4}, 5.9)
@@ -1180,7 +1348,7 @@ autoplay('#sc1', tl1);
 
 /* ---------- Mark up: box it, number it, point at it, paste it ---------- */
 const mkEd = $('#mkEd'), mkCv = $('#mkCanvas'), mkEp = $('#mkEp'), mkCopied = $('#mkCopied'), mkDone = $('#mkDone');
-const mkMe = $('#mkMe'), mkJules = $('#mkJules'), mkReact = $('#mkReact'), mkKv = $('#mkKv'), mkTools = $$('#mkEd .mk-t');
+const mkMe = $('#mkMe'), mkJack = $('#mkJack'), mkReact = $('#mkReact'), mkKv = $('#mkKv'), mkTools = $$('#mkEd .mk-t');
 const c2 = $('#c2'), c2i = c2.querySelector('i'); gsap.set(c2i, {transformOrigin:'4px 2px'});
 const CW = 360, CH = 420, CX = 36 + 120, CY = 26 + 44;           // canvas size and where it sits in the scene
 const mkShot = shot(P.invite, CW, CH, 'fit', '#e8e8ec', .95); mkCv.append(mkShot);
@@ -1201,14 +1369,14 @@ mkCv.insertAdjacentHTML('beforeend', annSVG(true));
 const fin = shot(P.invite, CW, CH, 'fit', '#e8e8ec', .95); fin.insertAdjacentHTML('beforeend', annSVG(false));
 fin.style.transform = `scale(${164 / CW})`; $('#mkImg').append(fin);
 const tool = i => ({x:i*40}), toolOn = (tl, i, t) => { tl.to(mkEp, {x:i*40, duration:.4, ease:'back.out(1.5)'}, t); mkTools.forEach((el, k) => tl.set(el, {className: k === i ? 'mk-t on' : 'mk-t'}, t + .12)); };
-const pulse = (tl, t) => tl.fromTo(mkCopied, {opacity:0, scale:.7}, {opacity:1, scale:1, duration:.3, ease:'back.out(2.2)'}, t).to(mkCopied, {opacity:0, duration:.4}, t + 1.1);
+const pulse = (tl, t) => tl.set(mkCopied, {opacity:0, scale:.7}, t).to(mkCopied, {opacity:1, scale:1, duration:.3, ease:'back.out(2.2)'}, t).to(mkCopied, {opacity:0, duration:.4}, t + 1.1);
 const P2 = (x, y) => ({left:CX + x, top:CY + y});
 const doneXY = () => ({left:36 + mkDone.offsetParent.offsetLeft - mkDone.offsetParent.offsetWidth/2 + mkDone.offsetLeft + 30, top:26 + 556 - 20 - 26});
 
 const tl2 = gsap.timeline({paused:true, repeat:-1, repeatDelay:.5, defaults:{ease:'power2.inOut'}});
 tl2.set('#mkR', {attr:{'stroke-dashoffset':100}}, 0).set('#mkA', {scaleX:0, transformOrigin:'0% 50%'}, 0)
    .set(['#mkS1', '#mkS2'], {scale:0, transformOrigin:'50% 50%'}, 0).set(mkCopied, {opacity:0}, 0)
-   .set([mkMe, mkJules], {display:'none'}, 0).set(mkReact, {scale:0}, 0).set(mkKv, {opacity:0}, 0)
+   .set([mkMe, mkJack], {display:'none'}, 0).set(mkReact, {scale:0}, 0).set(mkKv, {opacity:0}, 0)
    .set(c2, {left:560, top:560, opacity:1}, 0).set(mkEp, {x:0}, 0).set('#mkSl', {x:0}, 0);
 mkTools.forEach((el, k) => tl2.set(el, {className: k === 0 ? 'mk-t on' : 'mk-t'}, 0));
 tl2.fromTo(mkEd, {autoAlpha:0, scale:.96}, {autoAlpha:1, scale:1, duration:.5, ease:'power3.out'}, 0);
@@ -1244,10 +1412,10 @@ tl2.to(mkDone, {scale:.92, duration:.07, yoyo:true, repeat:1}, 5.1)
    .to(mkKv, {opacity:1, y:0, duration:.25, ease:'back.out(2)'}, 5.95)
    .set(mkMe, {display:'flex'}, 6.25).fromTo(mkMe, {opacity:0, y:18}, {opacity:1, y:0, duration:.45, ease:'power3.out'}, 6.25)
    .to(mkKv, {opacity:0, duration:.25}, 6.5)
-   .set(mkJules, {display:'flex'}, 7.4).fromTo(mkJules, {opacity:0, y:18}, {opacity:1, y:0, duration:.45, ease:'power3.out'}, 7.4)
+   .set(mkJack, {display:'flex'}, 7.4).fromTo(mkJack, {opacity:0, y:18}, {opacity:1, y:0, duration:.45, ease:'power3.out'}, 7.4)
    .to(mkReact, {scale:1, duration:.4, ease:'back.out(2.4)'}, 8.1)
    .to(c2, {opacity:0, duration:.3}, 8.2)
-   .to([mkMe, mkJules], {opacity:0, duration:.35}, 9.6)
+   .to([mkMe, mkJack], {opacity:0, duration:.35}, 9.6)
    .to('#mkSl', {x:0, duration:.7, ease:'power3.inOut'}, 9.8);
 gsap.set(mkKv, {xPercent:-50, y:8});
 autoplay('#sc2', tl2);
@@ -1255,7 +1423,7 @@ autoplay('#sc2', tl2);
 /* ---------- Paste into anything ---------- */
 const sc3 = $('#sc3 .inner'), t3 = $('#t3'), t3plate = $('#t3plate'), kv2 = $('#kv2');
 gsap.set(t3, {xPercent:-50});
-['home','invite','profile'].forEach((k, i) => { const t = thumb(k, 96, 62, i+1); t3plate.append(t); gsap.set(t.querySelectorAll('.rg,.n'), {opacity:1}); });
+['home','invite','profile'].forEach((k, i) => { const t = thumb(k, 96, 62, i+1); t3plate.append(t); gsap.set(t.querySelectorAll(':scope > .rg, :scope > .n'), {opacity:1}); });
 const ccAtts = $('#ccAtts'), ccSend = $('#ccSend');
 /* each pasted shot lives inside its app, so it rides along when the window lifts */
 const D = [
@@ -1276,7 +1444,7 @@ D.forEach((d, i) => {
   const t = .4 + i*1.55;
   tl3.to(d.el, {y:-10, boxShadow:'0 0 0 .5px rgba(0,0,0,.14),0 44px 80px -30px rgba(20,25,70,.55)', duration:.4}, t)
      .set(kv2, {left:d.kv[0], top:d.kv[1]}, t + .1)
-     .fromTo(kv2, {opacity:0, scale:.7, y:8}, {opacity:1, scale:1, y:0, duration:.3, ease:'back.out(2)'}, t + .15)
+     .set(kv2, {opacity:0, scale:.7, y:8}, t + .15).to(kv2, {opacity:1, scale:1, y:0, duration:.3, ease:'back.out(2)'}, t + .15)
      .fromTo(t3plate.children, {scale:1}, {scale:1.06, duration:.12, yoyo:true, repeat:1, stagger:.05}, t + .4);
   if (d.host === ccAtts) tl3.to(ccAtts, {height:60, marginBottom:10, duration:.35, ease:'power3.out'}, t + .38).to(ccSend, {opacity:1, duration:.2}, t + .5);
   tl3.to(d.nodes, {opacity:1, scale:1, y:0, duration:.5, stagger:.09, ease:'back.out(1.8)'}, t + .45)
