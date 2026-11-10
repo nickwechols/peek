@@ -1,0 +1,32 @@
+# Railway terminates HTTPS and forwards plain HTTP to $PORT.
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT:8080} {
+	# www lands on the one canonical address
+	@www host www.peekmac.xyz
+	redir @www https://peekmac.xyz{uri} 308
+
+	root * /srv
+	encode zstd gzip
+
+	# Short link to the latest installer on GitHub Releases
+	redir /download https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg 302
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+	@assets path *.webp *.jpg *.png *.woff2 *.svg
+	header @assets Cache-Control "public, max-age=604800"
+	@html path / *.html
+	header @html Cache-Control "public, max-age=300"
+
+	file_server
+}

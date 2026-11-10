@@ -13,7 +13,7 @@ Every screenshot goes straight to your clipboard. Paste it anywhere, and never d
 [![MIT License](https://img.shields.io/github/license/nickwechols/peek?style=flat-square&color=111218)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/nickwechols/peek/total?style=flat-square&color=4087ff)](https://github.com/nickwechols/peek/releases)
 
-### [Download for Mac](https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg) &nbsp;·&nbsp; [Website](https://nickwechols.github.io/peek/) &nbsp;·&nbsp; [Made by Nick Echols](https://github.com/nickwechols)
+### [Download for Mac](https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg) &nbsp;·&nbsp; [Website](https://peekmac.xyz) &nbsp;·&nbsp; [Made by Nick Echols](https://github.com/nickwechols)
 
 <br>
 
@@ -107,7 +107,7 @@ Sources/Peek/Peek.swift   The app: capture, tray, editor, Library, settings, set
 Resources/                App icon, Geist font, setup artwork, installer background, shutter sound
 scripts/                  Build script and artwork renderers
 design/                   Sources for the installer background and the GitHub artwork
-site/                     The landing page, published with GitHub Pages
+site/                     The landing page (peekmac.xyz), served by Caddy on Railway
 ```
 
 </details>
@@ -119,7 +119,7 @@ Bug reports, ideas and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIB
 ## Credits
 
 Designed and built by **Nick Echols**.<br>
-[GitHub](https://github.com/nickwechols) · [Instagram](https://instagram.com/fromnickechols) · [Website](https://nickwechols.github.io/peek/)
+[GitHub](https://github.com/nickwechols) · [Instagram](https://instagram.com/fromnickechols) · [Website](https://peekmac.xyz)
 
 - [Geist](https://vercel.com/font) by Vercel and basement.studio, bundled under the SIL Open Font License ([Resources/Fonts/OFL.txt](Resources/Fonts/OFL.txt)).
 - The landing page uses [Phosphor Icons](https://phosphoricons.com) and [GSAP](https://gsap.com).

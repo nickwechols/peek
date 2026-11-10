@@ -10,6 +10,12 @@
 <meta property="og:title" content="Peek, the screenshot app your Mac deserves">
 <meta property="og:description" content="Every screenshot goes straight to your clipboard. Free and open source for macOS.">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://peekmac.xyz/">
+<meta property="og:url" content="https://peekmac.xyz/">
+<meta property="og:image" content="https://peekmac.xyz/og.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:image" content="https://peekmac.xyz/og.jpg">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2315161b%22%20stroke-width%3D%228.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M15%2035V25Q15%2015%2025%2015H35%22/%3E%3Cpath%20d%3D%22M65%2015H75Q85%2015%2085%2025V35%22/%3E%3Cpath%20d%3D%22M85%2065V75Q85%2085%2075%2085H65%22/%3E%3Cpath%20d%3D%22M35%2085H25Q15%2085%2015%2075V65%22/%3E%3C/g%3E%3Cg%20fill%3D%22%2315161b%22%3E%3Crect%20x%3D%2240.5%22%20y%3D%2231%22%20width%3D%229.5%22%20height%3D%2231%22%20rx%3D%224.75%22/%3E%3Crect%20x%3D%2256.5%22%20y%3D%2231%22%20width%3D%229.5%22%20height%3D%2231%22%20rx%3D%224.75%22/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preload" as="image" href="hero-sky.webp">
 <link rel="preload" href="fonts/Phosphor-Fill.woff2" as="font" type="font/woff2" crossorigin>
@@ -37,7 +43,6 @@
 .ph.ph-diamonds-four:before{content:"\e8f4"}
 .ph.ph-drop-half:before{content:"\e566"}
 .ph.ph-eye-slash:before{content:"\e224"}
-.ph.ph-github-logo:before{content:"\e576"}
 .ph.ph-hash:before{content:"\e2a2"}
 .ph.ph-highlighter:before{content:"\ec76"}
 .ph.ph-house:before{content:"\e2c2"}
@@ -709,7 +714,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
 .ctas{display:flex;align-items:center;justify-content:center;gap:10px 26px;flex-wrap:wrap}
 .gh{display:inline-flex;align-items:center;gap:8px;padding:10px 4px;font-size:15px;font-weight:500;color:var(--ink);opacity:.66;transition:opacity .2s}
 .gh:hover,.gh:focus-visible{opacity:1}
-.gh i{font-size:19px}
+.gh svg{width:18px;height:18px;flex:none}
 .final3 .cta small{display:block;margin-top:14px;color:#4a4d5a;font-size:13.5px}
 .fwrap{margin-top:auto;padding-top:clamp(56px,8vh,96px);width:100%}
 .final3::after{content:"";position:absolute;inset:auto 0 0;height:42%;background:linear-gradient(rgba(18,24,44,0),rgba(18,24,44,.24) 40%,rgba(18,24,44,.42));z-index:-1;pointer-events:none}
@@ -765,7 +770,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
     <div class="rv hero-icon"><span class="appicon " data-peek><img src="peek-icon-noeyes.webp" alt=""><svg viewBox="0 0 512 512" aria-hidden="true"><g fill="#fff"><rect class="eye" x="230.5" y="204.5" width="25.5" height="83.5" rx="12.75"/><rect class="eye" x="273.5" y="204.5" width="25.5" height="83.5" rx="12.75"/></g></svg></span></div>
     <h1 class="rv">The screenshot app your Mac deserves</h1>
     <p class="sub rv">Every screenshot goes straight to your clipboard. Paste it anywhere, and never dig through your Desktop again.</p>
-    <div class="rv ctas"><a class="btn lg" href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download><i class="ph-fill ph-apple-logo"></i><span class="btn-label" data-btn-01="stagger">Download for Mac</span></a><a class="gh" href="https://github.com/nickwechols/peek"><i class="ph ph-github-logo"></i>View on GitHub</a></div>
+    <div class="rv ctas"><a class="btn lg" href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download><i class="ph-fill ph-apple-logo"></i><span class="btn-label" data-btn-01="stagger">Download for Mac</span></a><a class="gh" href="https://github.com/nickwechols/peek"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.230 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.760 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z"/></svg>View on GitHub</a></div>
   </div>
   <div class="hqclip" aria-hidden="true"><div class="hq" id="hq"><span id="hqs"></span></div></div>
   <div class="hcur" id="hcur"></div>
@@ -1016,7 +1021,7 @@ kbd{white-space:nowrap;font:600 .82em var(--mac);background:#fff;border-radius:6
     <div class="rv"><span class="appicon lg" data-peek><img src="peek-icon-noeyes.webp" alt="Peek app icon"><svg viewBox="0 0 512 512" aria-hidden="true"><g fill="#fff"><rect class="eye" x="230.5" y="204.5" width="25.5" height="83.5" rx="12.75"/><rect class="eye" x="273.5" y="204.5" width="25.5" height="83.5" rx="12.75"/></g></svg></span></div>
     <h2 class="rv">Peek is free.</h2>
     <p class="rv">Your Mac was expensive. This part isn't.</p>
-    <div class="rv ctas"><a class="btn lg" href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download><i class="ph-fill ph-apple-logo"></i><span class="btn-label" data-btn-01="stagger">Download for Mac</span></a><a class="gh" href="https://github.com/nickwechols/peek"><i class="ph ph-github-logo"></i>View on GitHub</a></div>
+    <div class="rv ctas"><a class="btn lg" href="https://github.com/nickwechols/peek/releases/latest/download/Peek.dmg" download><i class="ph-fill ph-apple-logo"></i><span class="btn-label" data-btn-01="stagger">Download for Mac</span></a><a class="gh" href="https://github.com/nickwechols/peek"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.230 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.760 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z"/></svg>View on GitHub</a></div>
     <small class="rv">macOS 13 or later, Apple silicon and Intel. Free and open source.</small>
   </div>
   <div class="wrap fwrap">

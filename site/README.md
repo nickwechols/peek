@@ -1,9 +1,19 @@
 # Peek landing page
 
-A single static page. Open `index.html`, or serve the folder:
+The site at [peekmac.xyz](https://peekmac.xyz). A single static page, no build step.
+
+Preview locally:
 
 ```sh
-python3 -m http.server 8000
+cd site && python3 -m http.server 8000
 ```
 
-The download buttons point at the latest GitHub Release (`releases/latest/download/Peek.dmg`). The page can be hosted as is on GitHub Pages, Netlify or Vercel.
+## Deploy
+
+The repo root has a `Dockerfile` and `Caddyfile` that serve this folder. Railway builds the Dockerfile on every deploy:
+
+```sh
+railway up
+```
+
+The Download buttons point at the latest GitHub Release (`releases/latest/download/Peek.dmg`), and `peekmac.xyz/download` redirects there too.
