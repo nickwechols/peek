@@ -34,6 +34,9 @@ macOS saves every screenshot as a file on your Desktop, and you go digging for i
 | **Copied the moment you capture** | Area or full screen. The shot is already on your clipboard, with a soft shutter sound you can turn off. |
 | **Copy several, in order** | <kbd>⌘</kbd>-click previews in the tray to pick shots in the order you want, then paste them all at once into Slack, Figma, Linear, your AI of choice or the group chat. |
 | **Mark it up** | Double-click a preview for arrows, boxes, a pen, a highlighter, text, numbered steps and blur. Everything is copied as you go. Press Return and you are done. |
+| **Screen recording** | Record an area or a whole screen, with click rings, your mic and your Mac's sound. The clip lands on your clipboard ready to paste, with one-click GIF and still frames for AI chats. |
+| **A quick video editor** | Trim, split and cut parts out, crop without losing anything, mute, and add arrows, boxes, text and numbered steps over time. Return saves a copy and copies it. |
+| **Make it yours** | Seven themes and six accent colors across the Library, both editors and the preview, which you can size, style and drag to any corner. |
 | **Works with your shortcuts** | Screenshots taken with the built-in macOS shortcuts land on your clipboard too. |
 | **Shortcuts you choose** | Click any capture shortcut in the Library and press the keys you want. |
 | **A Library, not a messy Desktop** | Every capture, grouped by day. Click to copy, <kbd>⌘</kbd>-click or <kbd>⇧</kbd>-click to copy several. |
@@ -56,17 +59,19 @@ Requires macOS 13 Ventura or later. Runs natively on Apple silicon and Intel.
 | :-- | :-- |
 | Capture an area | <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>2</kbd> |
 | Capture the screen | <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>1</kbd> |
+| Record the screen (again to stop) | <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>0</kbd> |
 | Open the Library | <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>L</kbd> |
 | Copy several, in order | <kbd>⌘</kbd> Click |
 | Mark up | Double-click |
 | Markup tools | <kbd>A</kbd> <kbd>R</kbd> <kbd>P</kbd> <kbd>H</kbd> <kbd>T</kbd> <kbd>N</kbd> <kbd>B</kbd> |
 | Done, already copied | <kbd>Return</kbd> |
+| Video: play, split, cut, crop, mute | <kbd>Space</kbd> <kbd>S</kbd> <kbd>Delete</kbd> <kbd>C</kbd> <kbd>M</kbd> |
 
 Capture shortcuts can be changed in **Library → Shortcuts**.
 
 ## Privacy
 
-Peek works entirely on your Mac. It makes no network requests and collects nothing. Screenshots are saved to `~/Pictures/Peek` and to your clipboard, and nowhere else.
+Peek works entirely on your Mac. It makes no network requests and collects nothing. Screenshots are saved to `~/Pictures/Peek`, recordings to `~/Movies/Peek` (or a folder you choose), and to your clipboard, and nowhere else. The microphone is only used while you record with it switched on.
 
 ## Build from source
 

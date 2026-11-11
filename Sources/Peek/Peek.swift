@@ -5,6 +5,7 @@
 // Command-click to copy several in order, double-click to mark it up. The tray hides
 // itself when you are done. The Library works exactly the same way.
 import AppKit
+import AVFoundation
 import SwiftUI
 import Carbon.HIToolbox
 import CoreImage
@@ -37,7 +38,6 @@ let palette: [Color] = [
     Color(white: 0.98),
     Color(white: 0.1),
 ]
-let accent = Color(red: 0.25, green: 0.53, blue: 1.0)
 
 /// The website's type, bundled with the app (Geist, SIL Open Font License). Used for the setup wizard and
 /// Library headings; small working UI stays on the system font. Falls back to the system font when run unbundled.
@@ -82,9 +82,10 @@ struct Glass: ViewModifier {
     var radius: CGFloat
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        let style = TrayLook.style
         return content
-            .background(shape.fill(Color.black.opacity(0.38)))
-            .background(.ultraThinMaterial, in: shape)
+            .background(shape.fill(editorPanel.opacity(style == "solid" ? 1 : (style == "clear" ? 0.22 : 0.5))))
+            .background(style == "solid" ? AnyShapeStyle(Color.clear) : AnyShapeStyle(.ultraThinMaterial), in: shape)
             .overlay(shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.3), .white.opacity(0.06)],
                                                        startPoint: .top, endPoint: .bottom), lineWidth: 0.8))
             .background(ShapeShadow(shape: shape, color: .black.opacity(0.32), radius: 20, y: 10))
@@ -143,9 +144,9 @@ struct OrderBadge: View {
         ZStack {
             Circle().fill(accent)
             if let n {
-                Text("\(n)").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                Text("\(n)").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(onAccent)
             } else {
-                Image(systemName: "checkmark").font(.system(size: 10, weight: .heavy)).foregroundStyle(.white)
+                Image(systemName: "checkmark").font(.system(size: 10, weight: .heavy)).foregroundStyle(onAccent)
             }
         }
         .frame(width: 21, height: 21)
@@ -167,11 +168,11 @@ struct Segmented<T: Hashable>: View {
                 Button { withAnimation(snappy) { value = v } } label: {
                     Text(options[i].1)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(value == v ? Color.black : (light ? Color.black.opacity(0.55) : Color.white.opacity(0.75)))
+                        .foregroundStyle(value == v ? onAccent : ink.opacity(0.62))
                         .padding(.horizontal, 12).frame(height: 26)
                         .background {
                             if value == v {
-                                Capsule().fill(.white).shadow(color: .black.opacity(light ? 0.12 : 0), radius: 2, y: 1)
+                                Capsule().fill(accent).shadow(color: .black.opacity(light ? 0.12 : 0.3), radius: 2, y: 1)
                                     .matchedGeometryEffect(id: "seg", in: ns)
                             }
                         }
@@ -181,7 +182,7 @@ struct Segmented<T: Hashable>: View {
             }
         }
         .padding(3)
-        .background(Capsule().fill(light ? Color.black.opacity(0.06) : Color.white.opacity(0.08)))
+        .background(Capsule().fill(ink.opacity(light ? 0.06 : 0.09)))
     }
 }
 
@@ -378,6 +379,15 @@ final class ThumbCache: @unchecked Sendable {
     }
     func load(_ u: URL, _ d: Date) async -> NSImage? {
         if let t = cached(u, d) { return t }
+        if isVideoFile(u) {
+            let gen = AVAssetImageGenerator(asset: AVURLAsset(url: u))
+            gen.appliesPreferredTrackTransform = true
+            gen.maximumSize = CGSize(width: 520, height: 520)
+            guard let r = try? await gen.image(at: CMTime(seconds: 0.3, preferredTimescale: 600)) else { return nil }
+            let img = NSImage(cgImage: r.image, size: NSSize(width: r.image.width, height: r.image.height))
+            cache.setObject(img, forKey: key(u, d), cost: cost(img))
+            return img
+        }
         return await withCheckedContinuation { c in
             imageWork.async {
                 guard let src = CGImageSourceCreateWithURL(u as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
@@ -678,12 +688,13 @@ struct Hotkey: Codable, Equatable {
 }
 
 enum HotkeyAction: String, CaseIterable, Identifiable {
-    case area, screen, library
+    case area, screen, record, library
     var id: String { rawValue }
     var title: String {
         switch self {
         case .area: return "Capture an area"
         case .screen: return "Capture the screen"
+        case .record: return "Record the screen"
         case .library: return "Open Library"
         }
     }
@@ -692,6 +703,7 @@ enum HotkeyAction: String, CaseIterable, Identifiable {
         case .area: return 1
         case .screen: return 2
         case .library: return 3
+        case .record: return 4
         }
     }
     var standard: Hotkey {
@@ -700,6 +712,7 @@ enum HotkeyAction: String, CaseIterable, Identifiable {
         case .area: return Hotkey(keyCode: UInt32(kVK_ANSI_2), mods: m, key: "2")
         case .screen: return Hotkey(keyCode: UInt32(kVK_ANSI_1), mods: m, key: "1")
         case .library: return Hotkey(keyCode: UInt32(kVK_ANSI_L), mods: m, key: "L")
+        case .record: return Hotkey(keyCode: UInt32(kVK_ANSI_0), mods: m, key: "0")   // free system-wide and in Slack, Docs, Notion and browsers
         }
     }
 }
@@ -732,8 +745,13 @@ enum HotkeyAction: String, CaseIterable, Identifiable {
         actions = handlers
         registerAll()
     }
+    /// A shortcut macOS or another app already owns fails quietly, so say so in Shortcuts instead.
     private func registerAll() {
-        for a in HotkeyAction.allCases { if let h = actions[a] { HotKeys.register(a.carbonID, key(a), h) } }
+        for a in HotkeyAction.allCases {
+            if let h = actions[a], !HotKeys.register(a.carbonID, key(a), h), problem == nil {
+                problem = (a, "macOS or another app already uses this. Click to pick another.")
+            }
+        }
     }
 
     /// Returns a short reason when the combination cannot be used.
@@ -970,8 +988,6 @@ struct ShortcutField: View {
 
 // MARK: - Tray (the floating preview)
 
-let thumbW: CGFloat = 168
-let thumbH: CGFloat = 106
 let maxThumbs = 5
 let trayMargin: CGFloat = 24
 let headerH: CGFloat = 38
@@ -1240,9 +1256,9 @@ struct TrayView: View {
                 Button { c.copyAll() } label: {
                     Label("Copy all", systemImage: "doc.on.doc")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(onAccent)
                         .padding(.horizontal, 10).frame(height: 26)
-                        .background(Capsule().fill(.white))
+                        .background(Capsule().fill(accent))
                 }
                 .buttonStyle(Squish())
                 .help("Copy every screenshot in the tray, oldest first")
@@ -1289,7 +1305,7 @@ struct ThumbView: View {
                 if t.flash == shot.id {
                     Image(systemName: "checkmark")
                         .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(onAccent)
                         .frame(width: 38, height: 38)
                         .background(Circle().fill(accent))
                         .shadow(color: .black.opacity(0.35), radius: 8, y: 3)
@@ -1626,7 +1642,7 @@ struct EditorView: View {
 
     var body: some View {
         ZStack {
-            VisualEffect().ignoresSafeArea()
+            editorBG.ignoresSafeArea()
             GeometryReader { geo in
                 let avail = CGSize(width: geo.size.width - 64, height: geo.size.height - 160)
                 let fit = fitSize(m.shot.pixelSize, in: avail)
@@ -1801,9 +1817,9 @@ struct EditorToolbar: View, Equatable {
             ForEach(Tool.allCases, id: \.self) { t in
                 Button { m.setTool(t) } label: {
                     ZStack {
-                        if tool == t { Capsule().fill(.white).matchedGeometryEffect(id: "tool", in: ns) }
+                        if tool == t { Capsule().fill(accent).matchedGeometryEffect(id: "tool", in: ns) }
                         Image(systemName: t.symbol).font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(tool == t ? Color.black : Color.white.opacity(0.82))
+                            .foregroundStyle(tool == t ? onAccent : Color.white.opacity(0.82))
                     }
                     .frame(width: 38, height: 32).contentShape(Capsule())
                 }
@@ -1828,9 +1844,9 @@ struct EditorToolbar: View, Equatable {
             }
             .buttonStyle(Squish()).help("Save As  ⌘S")
             Button(action: done) {
-                Text("Done").font(.system(size: 13, weight: .semibold)).foregroundStyle(.black)
+                Text("Done").font(.system(size: 13, weight: .semibold)).foregroundStyle(onAccent)
                     .padding(.horizontal, 16).frame(height: 32)
-                    .background(Capsule().fill(.white))
+                    .background(Capsule().fill(accent))
             }
             .buttonStyle(Squish()).padding(.leading, 4).help("Done. Already copied.  Return")
         }
@@ -1914,8 +1930,8 @@ struct EditorToolbar: View, Equatable {
                          backing: .buffered, defer: false)
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden
-        w.isOpaque = false
-        w.backgroundColor = .clear
+        w.backgroundColor = NSColor(editorBG)
+        w.appearance = NSAppearance(named: .darkAqua)
         w.isReleasedWhenClosed = false
         w.minSize = NSSize(width: 760, height: 440)
         w.delegate = self
@@ -2086,9 +2102,9 @@ struct DaySection: Identifiable {
     /// Lists files off the main thread (a directory read and a stat per file, no image decoding).
     func reload(animated: Bool = false) {
         generation += 1
-        let g = generation, recent = self.recent, dir = Capture.dir
+        let g = generation, recent = self.recent, dir = Capture.dir, vdir = Recordings.dir
         imageWork.async { [weak self] in
-            let out = LibraryModel.listing(recent, dir: dir)
+            let out = LibraryModel.listing(recent, dir: dir, videos: vdir)
             Task { @MainActor in
                 guard let self, self.generation == g else { return }
                 if animated { withAnimation(snappy) { self.apply(out) } } else { self.apply(out) }
@@ -2103,15 +2119,16 @@ struct DaySection: Identifiable {
         loaded = true
     }
 
-    nonisolated static func listing(_ recent: [URL], dir: URL) -> [DaySection] {
+    nonisolated static func listing(_ recent: [URL], dir: URL, videos: URL) -> [DaySection] {
         let fm = FileManager.default
         let dayFormat = DateFormatter()
         dayFormat.dateFormat = "EEEE, MMMM d"
-        let own = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey],
-                                                options: [.skipsHiddenFiles])) ?? []
+        let own = [dir, videos].flatMap { d in
+            (try? fm.contentsOfDirectory(at: d, includingPropertiesForKeys: [.contentModificationDateKey], options: [.skipsHiddenFiles])) ?? []
+        }
         var seen = Set<String>()
         let dated: [(URL, Date)] = (recent + own).compactMap { u in
-            guard ["png", "jpg", "jpeg", "heic"].contains(u.pathExtension.lowercased()), seen.insert(u.path).inserted,
+            guard ["png", "jpg", "jpeg", "heic", "mp4", "mov", "m4v"].contains(u.pathExtension.lowercased()), seen.insert(u.path).inserted,
                   let d = (try? u.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate else { return nil }
             return (u, d)
         }.sorted { $0.1 > $1.1 }
@@ -2164,6 +2181,12 @@ struct DaySection: Identifiable {
     /// and only the app you paste into pulls the bytes.
     func copySelection() {
         guard !selection.isEmpty else { return }
+        if selection.contains(where: isVideoFile) {       // videos travel as files
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.writeObjects(selection.map { $0 as NSURL })
+            return
+        }
         if selection.count == 1 {
             if let d = Clip.fileData(selection[0]) { Clip.copy(d) }
         } else {
@@ -2177,9 +2200,6 @@ struct DaySection: Identifiable {
 
 // Calm, warm surfaces for the windows you spend time in (Library, Setup).
 // The floating tray and the editor stay dark glass: they sit on top of your work.
-let canvasBG = Color(red: 0.965, green: 0.961, blue: 0.949)
-let ink = Color(red: 0.082, green: 0.086, blue: 0.106)
-let hairline = Color.black.opacity(0.07)
 
 /// The Peek mark: screenshot crop corners with two tall eyes.
 struct PeekMark: Shape {
@@ -2235,7 +2255,7 @@ struct PeekTile: View {
                 }
             }
             .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous).fill(ink)
+            .background(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous).fill(Color(hex: 0x15161B))
                 .shadow(color: Color(red: 0.12, green: 0.16, blue: 0.4).opacity(0.3), radius: size * 0.24, y: size * 0.12))
             .onHover { h in if h && lively && symbol == nil { Task { await glance() } } }
             .task {
@@ -2280,7 +2300,7 @@ struct Keycap: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
         Text(k)
-            .font(Brand.font(12.5, .semibold)).foregroundStyle(ink)
+            .font(Brand.font(12.5, .semibold)).foregroundStyle(Color(hex: 0x15161B))
             .frame(minWidth: 14).padding(.horizontal, 7).frame(height: 26)
             .background(shape.fill(LinearGradient(colors: [.white, Color(red: 0.953, green: 0.957, blue: 0.969)], startPoint: .top, endPoint: .bottom)))
             .overlay(shape.strokeBorder(Color.black.opacity(0.1), lineWidth: 1))
@@ -2291,6 +2311,7 @@ struct Keycap: View {
 
 struct LibraryView: View {
     @ObservedObject var m: LibraryModel
+    @ObservedObject private var store = ThemeStore.shared
     @Namespace private var ns
     private let pages: [(String, String)] = [("Library", "photo.on.rectangle.angled"), ("Shortcuts", "command"), ("Settings", "gearshape")]
 
@@ -2321,27 +2342,31 @@ struct LibraryView: View {
                 .animation(bouncy, value: m.selection.isEmpty)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.white)
+            .background(surface)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(hairline, lineWidth: 1))
             .shadow(color: .black.opacity(0.05), radius: 16, y: 4)
             .padding(.vertical, 10).padding(.trailing, 10)
         }
         .background(canvasBG)
-        .environment(\.colorScheme, .light)
+        .environment(\.colorScheme, theme.dark ? .dark : .light)
+        .id(store.key)                      // a theme switch re-colors every tile at once
+        .animation(.easeInOut(duration: 0.25), value: store.key)
+        .onChange(of: store.key) { _ in NSApp.windows.forEach { w in if w.title == "Peek Library" || w.identifier?.rawValue == "library" { w.backgroundColor = NSColor(canvasBG) } } }
     }
 
     var sidebar: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 9) {
-                PeekMark().fill(ink).frame(width: 22, height: 22)
-                Text("Peek").font(Brand.font(20, .semibold)).tracking(-0.6).foregroundStyle(ink)
+                LivelyMark(color: ink).frame(width: 30, height: 30)
+                Text("Peek").font(Brand.font(23, .semibold)).tracking(-0.7).foregroundStyle(ink)
             }
             .padding(.leading, 12).padding(.top, 54).padding(.bottom, 24)
             ForEach(pages.indices, id: \.self) { i in
                 Button { withAnimation(snappy) { m.tab = i } } label: {
                     HStack(spacing: 11) {
                         Image(systemName: pages[i].1).font(.system(size: 15)).frame(width: 20)
+                            .foregroundStyle(m.tab == i ? accent : ink.opacity(0.68))
                         Text(pages[i].0).font(.system(size: 14, weight: .medium))
                         Spacer(minLength: 0)
                     }
@@ -2349,7 +2374,7 @@ struct LibraryView: View {
                     .padding(.horizontal, 12).frame(height: 36)
                     .background {
                         if m.tab == i {
-                            RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.black.opacity(0.055))
+                            RoundedRectangle(cornerRadius: 9, style: .continuous).fill(ink.opacity(0.07))
                                 .matchedGeometryEffect(id: "nav", in: ns)
                         }
                     }
@@ -2384,7 +2409,7 @@ struct LibraryView: View {
                             }
                         }
                     }
-                    Text("Click to copy. Command-click or Shift-click to copy several. Double-click to mark up.")
+                    Text("Click to copy. Command-click or Shift-click to copy several. Double-click to mark up or edit.")
                         .font(.system(size: 11.5)).foregroundStyle(ink.opacity(0.35))
                         .frame(maxWidth: .infinity)
                 }
@@ -2410,21 +2435,25 @@ struct LibTile: View {
         let order = m.selection.firstIndex(of: item.url)
         let on = order != nil
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        Color(white: 0.955)
+        let video = isVideoFile(item.url)
+        ink.opacity(0.05)
             .frame(height: 128)
             .overlay {
                 if let thumb { Image(nsImage: thumb).resizable().aspectRatio(contentMode: .fill).transition(.opacity) }
             }
+            .overlay(alignment: .bottomLeading) {
+                if video { VideoBadge(url: item.url).padding(8) }
+            }
             .clipShape(shape)
-            .background(shape.fill(Color(white: 0.955))
+            .background(shape.fill(ink.opacity(0.05))
                 .shadow(color: .black.opacity(hover ? 0.12 : 0.04), radius: hover ? 16 : 4, y: hover ? 8 : 2))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(on ? accent : Color.black.opacity(hover ? 0.14 : 0.07), lineWidth: on ? 3 : 1))
+                .strokeBorder(on ? accent : ink.opacity(hover ? 0.16 : 0.08), lineWidth: on ? 3 : 1))
             .overlay(alignment: .topLeading) {
                 if let order { OrderBadge(n: m.selection.count > 1 ? order + 1 : nil).padding(8).transition(.pop) }
             }
             .overlay(alignment: .topTrailing) {
-                if hover { RoundButton(symbol: "pencil.tip", help: "Mark up") { m.markup(item.url) }.padding(4).transition(.pop) }
+                if hover { RoundButton(symbol: video ? "scissors" : "pencil.tip", help: video ? "Edit" : "Mark up") { m.markup(item.url) }.padding(4).transition(.pop) }
             }
             .scaleEffect(on ? 0.965 : (hover ? 1.015 : 1))
             .animation(snappy, value: hover)
@@ -2441,7 +2470,7 @@ struct LibTile: View {
             }
             .contextMenu {
                 Button("Copy") { m.click(item.url) }
-                Button("Mark Up") { m.markup(item.url) }
+                Button(video ? "Edit" : "Mark Up") { m.markup(item.url) }
                 Menu("Share") {
                     ForEach(NSSharingService.sharingServices(forItems: [item.url]), id: \.title) { svc in
                         Button { svc.perform(withItems: [item.url]) } label: { Label { Text(svc.title) } icon: { Image(nsImage: svc.image) } }
@@ -2470,10 +2499,11 @@ struct SelectionBar: View {
             Rectangle().fill(.white.opacity(0.15)).frame(width: 1, height: 18).padding(.horizontal, 4)
             if m.selection.count == 1 {
                 Button { m.markup(m.selection[0]) } label: {
-                    Label("Mark up", systemImage: "pencil.tip")
-                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(ink)
+                    Label(m.selection.first.map(isVideoFile) == true ? "Edit" : "Mark up",
+                          systemImage: m.selection.first.map(isVideoFile) == true ? "scissors" : "pencil.tip")
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(onAccent)
                         .padding(.horizontal, 12).frame(height: 30)
-                        .background(Capsule().fill(.white))
+                        .background(Capsule().fill(accent))
                 }
                 .buttonStyle(Squish()).help("Mark up  Return")
                 .transition(.pop)
@@ -2485,8 +2515,9 @@ struct SelectionBar: View {
             bar("xmark", "Deselect  Esc") { m.clear() }
         }
         .padding(5)
-        .background(Capsule().fill(ink))
-        .overlay(Capsule().strokeBorder(.white.opacity(0.08), lineWidth: 1))
+        .background(Capsule().fill(editorPanel))
+        .overlay(Capsule().strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .environment(\.colorScheme, .dark)
         .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
         .animation(bouncy, value: m.selection.count)
     }
@@ -2507,8 +2538,9 @@ struct Group2<C: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title.uppercased()).font(.system(size: 11.5, weight: .semibold)).tracking(1.1).foregroundStyle(ink.opacity(0.45))
-            VStack(spacing: 0) { content }
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.025)))
+            VStack(alignment: .leading, spacing: 0) { content }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(ink.opacity(0.03)))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(hairline, lineWidth: 1))
         }
     }
@@ -2544,6 +2576,12 @@ struct ShortcutsView: View {
                 }
                 group("Preview and Library", [("Copy one", "Click"), ("Copy several, in order", "⌘ Click"),
                                                ("Copy a range", "⇧ Click"), ("Mark up", "Double-click"), ("Copy everything", "⌘ A")])
+                group("Recording", [("Record an area", "Drag"), ("Record a whole screen", "Click  or  Return"),
+                                    ("Start now, skip the countdown", "Space"), ("Cancel", "Esc")])
+                group("Video editor", [("Play / Pause", "Space"), ("Split at the playhead", "S"), ("Split anywhere (click the timeline)", "B"),
+                                       ("Delete the selected clip or annotation", "Delete"), ("Mute / unmute", "M"), ("Step a frame / a second", "←  →  /  ⇧ ←  →"),
+                                       ("Previous / next cut", "↑  ↓"), ("Crop", "C"), ("Annotate", "A  R  T  N"),
+                                       ("Back out one step", "Esc"), ("Save and copy", "Return")])
                 group("Markup", [("Tools", "A  R  P  H  T  N  B"), ("Colors", "1 - 6"), ("Smaller / bigger", "-  ="),
                                  ("Undo / Redo", "⌘ Z  /  ⇧ ⌘ Z"), ("Delete selection", "Delete"), ("Done, copied", "Return")])
             }
@@ -2569,54 +2607,63 @@ struct ShortcutsView: View {
     }
 }
 
+/// A tiny desktop. Click a spot, or drag the preview and let go near one: it springs into place.
 struct PositionPicker: View {
     @Binding var pos: String
-    @Namespace private var ns
+    @State private var drag: CGPoint?
+    private let size = CGSize(width: 300, height: 186)
+    private let chip = CGSize(width: 58, height: 34)
+
+    func center(_ p: TrayPosition) -> CGPoint {
+        let xs: [CGFloat] = [12 + chip.width / 2, size.width / 2, size.width - 12 - chip.width / 2]
+        return CGPoint(x: xs[p.col], y: p.isTop ? 17 + chip.height / 2 : size.height - 14 - chip.height / 2)
+    }
+    func nearest(_ q: CGPoint) -> TrayPosition {
+        TrayPosition.allCases.min { hypot(center($0).x - q.x, center($0).y - q.y) < hypot(center($1).x - q.x, center($1).y - q.y) }!
+    }
 
     var body: some View {
-        ZStack {
+        let current = TrayPosition(rawValue: pos) ?? .bottomCenter
+        let target = drag.map(nearest)
+        ZStack(alignment: .topLeading) {
             LinearGradient(colors: [Color(red: 0.56, green: 0.65, blue: 0.96), Color(red: 0.85, green: 0.77, blue: 0.94), Color(red: 1.0, green: 0.88, blue: 0.77)],
                            startPoint: .top, endPoint: .bottom)
-            VStack(spacing: 0) {
-                Rectangle().fill(.white.opacity(0.35)).frame(height: 9)
-                Spacer()
-                Capsule().fill(.white.opacity(0.4)).frame(width: 110, height: 13).padding(.bottom, 5)
+            Rectangle().fill(.white.opacity(0.35)).frame(width: size.width, height: 9)
+            ForEach(TrayPosition.allCases) { p in
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(.white.opacity(target == p ? 1 : 0.7), style: StrokeStyle(lineWidth: target == p ? 1.5 : 1, dash: [3, 3]))
+                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.white.opacity(target == p ? 0.22 : 0)))
+                    .frame(width: chip.width, height: chip.height)
+                    .contentShape(Rectangle())
+                    .position(center(p))
+                    .onTapGesture { withAnimation(bouncy) { pos = p.rawValue } }
             }
-            VStack(spacing: 0) {
-                row([.topLeft, .topCenter, .topRight])
-                Spacer()
-                row([.bottomLeft, .bottomCenter, .bottomRight])
-            }
-            .padding(.horizontal, 12).padding(.top, 17).padding(.bottom, 24)
+            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color(hex: 0x15161B).opacity(0.85))
+                .overlay(HStack(spacing: 3) {
+                    RoundedRectangle(cornerRadius: 2).fill(.white.opacity(0.95))
+                    RoundedRectangle(cornerRadius: 2).fill(.white.opacity(0.55))
+                }.padding(4))
+                .frame(width: chip.width, height: chip.height)
+                .scaleEffect(drag == nil ? 1 : 1.08)
+                .shadow(color: .black.opacity(drag == nil ? 0.25 : 0.35), radius: drag == nil ? 5 : 10, y: drag == nil ? 2 : 6)
+                .position(drag ?? center(current))
+                .onContinuousHover { _ in (drag == nil ? NSCursor.openHand : NSCursor.closedHand).set() }
+                .gesture(DragGesture(minimumDistance: 2, coordinateSpace: .named("picker"))
+                    .onChanged { v in
+                        let x = min(max(chip.width / 2, v.location.x), size.width - chip.width / 2)
+                        let y = min(max(chip.height / 2, v.location.y), size.height - chip.height / 2)
+                        if drag == nil { withAnimation(snappy) { drag = CGPoint(x: x, y: y) } } else { drag = CGPoint(x: x, y: y) }
+                    }
+                    .onEnded { v in
+                        let p = nearest(v.location)
+                        withAnimation(bouncy) { pos = p.rawValue; drag = nil }
+                    })
         }
-        .frame(width: 300, height: 186)
+        .frame(width: size.width, height: size.height)
+        .coordinateSpace(name: "picker")
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(hairline, lineWidth: 1))
-    }
-
-    func row(_ ps: [TrayPosition]) -> some View {
-        HStack { spot(ps[0]); Spacer(); spot(ps[1]); Spacer(); spot(ps[2]) }
-    }
-
-    func spot(_ p: TrayPosition) -> some View {
-        Button { withAnimation(bouncy) { pos = p.rawValue } } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(.white.opacity(0.75), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                if pos == p.rawValue {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous).fill(ink.opacity(0.82))
-                        .overlay(HStack(spacing: 3) {
-                            RoundedRectangle(cornerRadius: 2).fill(.white.opacity(0.95))
-                            RoundedRectangle(cornerRadius: 2).fill(.white.opacity(0.55))
-                        }.padding(4))
-                        .shadow(color: .black.opacity(0.25), radius: 5, y: 2)
-                        .matchedGeometryEffect(id: "spot", in: ns)
-                }
-            }
-            .frame(width: 58, height: 34)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(Squish())
+        .animation(snappy, value: target)
     }
 }
 
@@ -2626,11 +2673,26 @@ struct SettingsView: View {
     @AppStorage("watchNative") private var watchNative = true
     @AppStorage("shutterSound") private var shutterSound = true
     @AppStorage("hideThumb") private var hideThumb = false
+    @AppStorage("traySize") private var traySize = 1
+    @AppStorage("trayStyle") private var trayStyle = "glass"
+    @AppStorage("rec.clicks") private var recClicks = true
+    @AppStorage("rec.cursor") private var recCursor = true
+    @AppStorage("rec.countdown") private var recCountdown = true
+    @AppStorage("rec.mic") private var recMic = false
+    @AppStorage("rec.audio") private var recAudio = false
+    @AppStorage("rec.fps") private var recFPS = 60
+    @AppStorage("rec.codec") private var recCodec = "h264"
+    @AppStorage("rec.quality") private var recQuality = 1
+    @AppStorage("rec.keepOriginal") private var recKeep = true
+    @AppStorage("rec.dir") private var recDir = ""
     @State private var atLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
+                Group2(title: "Appearance") {
+                    ThemePicker().padding(16)
+                }
                 Group2(title: "Preview") {
                     VStack(alignment: .leading, spacing: 12) {
                         label("Where the preview appears", "Pick a corner or an edge")
@@ -2641,7 +2703,21 @@ struct SettingsView: View {
                     HStack {
                         label("Hide it after", "Hovering keeps it open")
                         Spacer()
-                        Segmented(options: [(10, "10s"), (30, "30s"), (60, "1 min"), (0, "Never")], value: $dismissAfter)
+                        Segmented(options: [(5, "5s"), (10, "10s"), (30, "30s"), (60, "1 min"), (0, "Never")], value: $dismissAfter)
+                    }
+                    .padding(16)
+                    divider
+                    HStack {
+                        label("Size", "How big the floating preview is")
+                        Spacer()
+                        Segmented(options: [(0, "Small"), (1, "Medium"), (2, "Large")], value: $traySize)
+                    }
+                    .padding(16)
+                    divider
+                    HStack {
+                        label("Style", ["Frosted glass over your work", "Barely there", "Solid, in your theme's color"][["glass", "clear", "solid"].firstIndex(of: trayStyle) ?? 0])
+                        Spacer()
+                        Segmented(options: [("glass", "Glass"), ("clear", "Clear"), ("solid", "Solid")], value: $trayStyle)
                     }
                     .padding(16)
                 }
@@ -2660,6 +2736,40 @@ struct SettingsView: View {
                         }
                         .padding(16)
                 }
+                Group2(title: "Recording") {
+                    Toggle(isOn: $recClicks) { label("Show clicks", "A soft ring wherever you click") }.padding(16)
+                    divider
+                    Toggle(isOn: $recCursor) { label("Show the pointer", "Turn off for clean product shots") }.padding(16)
+                    divider
+                    Toggle(isOn: $recCountdown) { label("Countdown", "Three seconds to get ready. Space skips it.") }.padding(16)
+                    divider
+                    Toggle(isOn: $recMic) { label("Microphone", "Narrate as you go") }.padding(16)
+                    divider
+                    Toggle(isOn: $recAudio) { label("Mac sound", "Record what your Mac plays") }.padding(16)
+                    divider
+                    HStack {
+                        label("Frame rate", "60 for smooth motion, 30 for smaller files")
+                        Spacer()
+                        Segmented(options: [(30, "30"), (60, "60")], value: $recFPS)
+                    }
+                    .padding(16)
+                    divider
+                    HStack {
+                        label("Format", recCodec == "hevc" ? "HEVC. About half the size, plays on recent devices." : "H.264. Plays everywhere.")
+                        Spacer()
+                        Segmented(options: [("h264", "H.264"), ("hevc", "HEVC")], value: $recCodec)
+                    }
+                    .padding(16)
+                    divider
+                    HStack {
+                        label("Quality", ["Smaller files, saved edits up to 1080p", "Sharp text, sensible size", "Highest bitrate"][min(max(recQuality, 0), 2)])
+                        Spacer()
+                        Segmented(options: [(0, "Smaller"), (1, "Balanced"), (2, "Best")], value: $recQuality)
+                    }
+                    .padding(16)
+                    divider
+                    Toggle(isOn: $recKeep) { label("Keep the original when saving edits", recKeep ? "Edits save as a new file next to it" : "Edits replace the recording") }.padding(16)
+                }
                 Group2(title: "Storage") {
                     HStack {
                         label("Screenshots folder", Capture.dir.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
@@ -2667,7 +2777,36 @@ struct SettingsView: View {
                         Button { NSWorkspace.shared.open(Capture.dir) } label: {
                             Text("Open").font(.system(size: 12.5, weight: .semibold)).foregroundStyle(ink)
                                 .padding(.horizontal, 14).frame(height: 28)
-                                .background(Capsule().fill(.white))
+                                .background(Capsule().fill(surface))
+                                .overlay(Capsule().strokeBorder(hairline, lineWidth: 1))
+                        }
+                        .buttonStyle(Squish())
+                    }
+                    .padding(16)
+                    divider
+                    HStack {
+                        label("Recordings folder", (recDir.isEmpty ? Recordings.defaultDir.path : recDir).replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                        Spacer()
+                        Button {
+                            let panel = NSOpenPanel()
+                            panel.canChooseFiles = false
+                            panel.canChooseDirectories = true
+                            panel.canCreateDirectories = true
+                            panel.prompt = "Use This Folder"
+                            panel.directoryURL = Recordings.dir
+                            NSApp.activate(ignoringOtherApps: true)
+                            if panel.runModal() == .OK, let u = panel.url { recDir = u.path }
+                        } label: {
+                            Text("Change").font(.system(size: 12.5, weight: .semibold)).foregroundStyle(ink)
+                                .padding(.horizontal, 14).frame(height: 28)
+                                .background(Capsule().fill(surface))
+                                .overlay(Capsule().strokeBorder(hairline, lineWidth: 1))
+                        }
+                        .buttonStyle(Squish())
+                        Button { NSWorkspace.shared.open(Recordings.dir) } label: {
+                            Text("Open").font(.system(size: 12.5, weight: .semibold)).foregroundStyle(ink)
+                                .padding(.horizontal, 14).frame(height: 28)
+                                .background(Capsule().fill(surface))
                                 .overlay(Capsule().strokeBorder(hairline, lineWidth: 1))
                         }
                         .buttonStyle(Squish())
@@ -2675,8 +2814,7 @@ struct SettingsView: View {
                     .padding(16)
                 }
             }
-            .toggleStyle(.switch)
-            .tint(ink)
+            .toggleStyle(RowToggle())
             .frame(maxWidth: 560, alignment: .leading)
             .padding(.horizontal, 36).padding(.top, 6).padding(.bottom, 40)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -2708,7 +2846,8 @@ struct SettingsView: View {
             w.titlebarAppearsTransparent = true
             w.titleVisibility = .hidden
             w.isOpaque = true
-            w.backgroundColor = NSColor(red: 0.965, green: 0.961, blue: 0.949, alpha: 1)
+            w.backgroundColor = NSColor(canvasBG)
+            w.identifier = NSUserInterfaceItemIdentifier("library")
             w.appearance = NSAppearance(named: .aqua)
             w.isReleasedWhenClosed = false
             w.minSize = NSSize(width: 720, height: 460)
@@ -2823,6 +2962,8 @@ struct Sky: View {
 struct SetupView: View {
     @ObservedObject var s: SetupModel
     private let skies = ["setup-welcome", "setup-permission", "setup-choices"]
+    private let ink = Color(hex: 0x15161B)
+    private let canvasBG = Color(hex: 0xF6F5F2)
     private let ink2 = Color(red: 0.149, green: 0.157, blue: 0.196)
 
     var body: some View {
@@ -3039,9 +3180,13 @@ struct SetupView: View {
     let watcher = SystemWatcher()
     let setup = SetupController()
     let library = LibraryController()
+    let recorder = RecordController()
+    let clips = ClipCardController()
+    let clipEditor = ClipEditorController()
     private var session: [Shot] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        TrayLook.refresh()
         Brand.registerFonts()
         trayC = TrayController(actions: TrayActions(
             markup: { [weak self] s in self?.editor.open(s) },
@@ -3051,6 +3196,7 @@ struct SetupView: View {
         editor.onClose = { [weak self] in self?.library.refreshIfVisible() }
         library.model.markup = { [weak self] url in
             guard let self else { return }
+            if isVideoFile(url) { self.clipEditor.open(url); return }
             if let s = self.session.first(where: { $0.url == url }) { self.editor.open(s); return }
             Shot.load({ try? Data(contentsOf: url) }, url: url, done: { [weak self] s in if let s { self?.editor.open(s) } })
         }
@@ -3062,7 +3208,24 @@ struct SetupView: View {
             .area: { [weak self] in self?.captureArea() },
             .screen: { [weak self] in self?.captureScreen() },
             .library: { [weak self] in self?.library.show() },
+            .record: { [weak self] in self?.recorder.toggle() },
         ])
+        recorder.onPhase = { [weak self] in self?.buildMenu() }
+        recorder.onFinished = { [weak self] url in
+            Clip.copyFile(url)
+            self?.remember(url)
+            self?.clips.show(url)
+        }
+        clips.onEdit = { [weak self] url in self?.clipEditor.open(url) }
+        clipEditor.onSaved = { [weak self] url in
+            Clip.copyFile(url)
+            self?.remember(url)
+            self?.clips.show(url, status: "Saved and copied")
+        }
+        clipEditor.onCancel = { [weak self] url in
+            Clip.copyFile(url)
+            self?.clips.show(url)
+        }
         watcher.onNew = { [weak self] url in
             guard let self, Prefs.watchNative else { return }
             self.ingest(url)
@@ -3085,6 +3248,9 @@ struct SetupView: View {
     @objc func captureArea() { capture(["-i", "-x"]) }
     @objc func captureScreen() { capture(["-x", "-m"]) }
     @objc func showLibrary() { library.show() }
+    @objc func toggleRecording() { recorder.toggle() }
+    @objc func pauseRecording() { recorder.togglePause() }
+    @objc func showRecordings() { NSWorkspace.shared.open(Recordings.dir) }
     @objc func showSettings() { library.show(tab: 2) }
     @objc func showSetup() { setup.show() }
     @objc func showAbout() {
@@ -3146,12 +3312,25 @@ struct SetupView: View {
         }
         mark.isTemplate = true
         mark.accessibilityDescription = "Peek"
-        status.button?.image = mark
+        let recording = recorder.phase == .recording
+        if recording, let dot = NSImage(systemSymbolName: recorder.paused ? "pause.circle" : "record.circle", accessibilityDescription: "Recording") {
+            dot.isTemplate = true
+            status.button?.image = dot
+        } else {
+            status.button?.image = mark
+        }
         let menu = NSMenu()
+        if recording {
+            menu.addItem(hotkeyItem("Stop Recording", #selector(toggleRecording), .record))
+            menu.addItem(item(recorder.paused ? "Resume Recording" : "Pause Recording", #selector(pauseRecording)))
+            menu.addItem(.separator())
+        }
         menu.addItem(hotkeyItem("Capture Area", #selector(captureArea), .area))
         menu.addItem(hotkeyItem("Capture Screen", #selector(captureScreen), .screen))
+        if !recording { menu.addItem(hotkeyItem("Record Screen", #selector(toggleRecording), .record)) }
         menu.addItem(.separator())
         menu.addItem(hotkeyItem("Library", #selector(showLibrary), .library))
+        menu.addItem(item("Recordings Folder", #selector(showRecordings)))
         menu.addItem(item("Settings…", #selector(showSettings), ",", [.command]))
         menu.addItem(item("Setup…", #selector(showSetup)))
         menu.addItem(item("About Peek", #selector(showAbout)))
@@ -3171,5 +3350,79 @@ struct SetupView: View {
         i.keyEquivalentModifierMask = mods
         i.target = self
         return i
+    }
+}
+
+
+func isVideoFile(_ u: URL) -> Bool { ["mp4", "mov", "m4v"].contains(u.pathExtension.lowercased()) }
+
+/// Marks a Library tile as a video: a play glyph and the length, on a dark chip so it reads on any frame.
+struct VideoBadge: View {
+    @MainActor static var known: [URL: Double] = [:]
+    let url: URL
+    @State private var duration: Double?
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "play.fill").font(.system(size: 8.5, weight: .bold))
+            if let duration { Text(Recordings.time(duration)).monospacedDigit().transition(.opacity) }
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8).frame(height: 22)
+        .background(Capsule().fill(Color.black.opacity(0.62)))
+        .task(id: url) {
+            if let d = VideoBadge.known[url] { duration = d; return }     // scrolling back costs nothing
+            let d = try? await AVURLAsset(url: url).load(.duration).seconds
+            if let d { VideoBadge.known[url] = d }
+            withAnimation(.easeOut(duration: 0.2)) { duration = d }
+        }
+    }
+}
+
+
+/// The mark with eyes that live a little: every so often a slow blink, or a look to one side and back.
+/// Ambient on purpose. You notice it only if you happen to be looking. Still under Reduce Motion.
+struct LivelyMark: View {
+    var color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var ex: CGFloat = 0
+    @State private var sy: CGFloat = 1
+
+    var body: some View {
+        GeometryReader { g in
+            let u = min(g.size.width, g.size.height) / 100
+            ZStack(alignment: .topLeading) {
+                PeekMark(eyes: false).fill(color)
+                ForEach([45.25, 61.25], id: \.self) { cx in
+                    RoundedRectangle(cornerRadius: 4.75 * u, style: .continuous).fill(color)
+                        .frame(width: 9.5 * u, height: 31 * u)
+                        .scaleEffect(x: 1, y: sy)
+                        .position(x: (cx + ex) * u, y: 46.5 * u)
+                }
+            }
+        }
+        .task {
+            guard !reduceMotion else { return }
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            while !Task.isCancelled {
+                if Int.random(in: 0..<3) == 0 { await look() } else { await blink() }
+                try? await Task.sleep(nanoseconds: UInt64.random(in: 5_000_000_000...11_000_000_000))
+            }
+        }
+    }
+
+    private func blink() async {
+        withAnimation(.easeIn(duration: 0.08)) { sy = 0.12 }
+        try? await Task.sleep(nanoseconds: 90_000_000)
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) { sy = 1 }
+    }
+
+    private func look() async {
+        let dir: CGFloat = Bool.random() ? -1 : 1
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) { ex = dir * 5 }
+        try? await Task.sleep(nanoseconds: UInt64.random(in: 900_000_000...1_500_000_000))
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.8)) { ex = 0 }
+        try? await Task.sleep(nanoseconds: 350_000_000)
+        if Bool.random() { await blink() }
     }
 }

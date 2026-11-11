@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${VERSION:-1.3.0}"
+VERSION="${VERSION:-1.4.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
 APP=build/Peek.app
 VOL="Peek"
@@ -49,7 +49,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSHumanReadableCopyright</key><string>Made by Nick Echols. Free and open source under the MIT License.</string>
-<key>NSScreenCaptureUsageDescription</key><string>Peek captures your screen when you take a screenshot.</string>
+<key>NSScreenCaptureUsageDescription</key><string>Peek captures your screen when you take a screenshot or a recording.</string>
+<key>NSMicrophoneUsageDescription</key><string>Peek records your voice when you turn on the microphone for a screen recording.</string>
 </dict></plist>
 PLIST
 
