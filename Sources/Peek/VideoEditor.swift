@@ -14,6 +14,7 @@ struct VClip: Identifiable, Equatable {
     var id = UUID()
     var start: Double
     var end: Double
+    var cam: CamMode = .bubble
     var len: Double { end - start }
 }
 
@@ -48,11 +49,24 @@ enum MarkTool: String, CaseIterable {
 
 enum EditMode { case edit, blade, crop }
 
+/// A stretch of the camera layer, in source time. Only used once the camera is unlinked from the video.
+struct CamSeg: Identifiable, Equatable {
+    var id = UUID()
+    var start: Double
+    var end: Double
+    var mode: CamMode = .bubble
+}
+
 struct EditState: Equatable {
     var clips: [VClip] = []
     var crop: CGRect?
     var notes: [VNote] = []
     var muted = false
+    var cam: CamLayout?
+    /// Linked (the default): the camera is part of each clip, so cuts, trims and deletes take it along.
+    /// Unlinked: the camera layer has its own cuts, so it can hide or go full screen anywhere.
+    var camLinked = true
+    var camSegs: [CamSeg] = []
 }
 
 /// The playhead's time lives on its own, so playback redraws only the playhead, the time and the
@@ -66,6 +80,15 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
     let url: URL
     let asset: AVURLAsset
     let player = AVPlayer()
+    /// A presentation: the raw screen recording, your camera beside it, and the edit that made the clip.
+    let meta: PresentMeta?
+    let screenURL: URL
+    let cameraURL: URL?
+    let camPlayer: AVPlayer?
+    private let camAsset: AVURLAsset?
+    private var lastResync = -10.0
+    private var camRange = CMTimeRange.zero
+    @Published var cameraOpen = false
     @Published var s = EditState()
     @Published var duration: Double = 0
     @Published var natural = CGSize(width: 16, height: 10)
@@ -84,6 +107,8 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
     @Published var editingText: UUID?
     @Published var draft: Mark?
     @Published var strip: [NSImage] = []
+    @Published var camStrip: [NSImage] = []
+    @Published var selectedSeg: UUID?
     @Published var exporting = false
     @Published var hint: String?
     @Published var ready = false
@@ -99,7 +124,16 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
 
     init(url: URL) {
         self.url = url
-        asset = AVURLAsset(url: url)
+        if let (m, s, c) = Present.load(url) {
+            meta = m; screenURL = s; cameraURL = c
+        } else {
+            meta = nil; screenURL = url; cameraURL = nil
+        }
+        asset = AVURLAsset(url: screenURL)
+        camAsset = cameraURL.map { AVURLAsset(url: $0) }
+        camPlayer = cameraURL.map { _ in AVPlayer() }
+        camPlayer?.isMuted = true
+        camPlayer?.actionAtItemEnd = .pause
         player.actionAtItemEnd = .pause
         observer = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30), queue: .main) { [weak self] t in
             let v = t.seconds
@@ -110,19 +144,61 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
 
     func teardown() {
         player.pause()
+        camPlayer?.pause()
         if let observer { player.removeTimeObserver(observer) }
         observer = nil
         buildTask?.cancel()
     }
 
     private func load() async {
-        let d = (try? await asset.load(.duration).seconds) ?? 0
-        if let t = try? await asset.loadTracks(withMediaType: .video).first, let n = try? await t.load(.naturalSize) { natural = n }
-        hasAudio = !((try? await asset.loadTracks(withMediaType: .audio)) ?? []).isEmpty
+        // The three reads are independent, so they run together instead of one after another before the editor appears.
+        let asset = self.asset
+        async let durationLoad = asset.load(.duration)
+        async let videoLoad = asset.loadTracks(withMediaType: .video)
+        async let audioLoad = asset.loadTracks(withMediaType: .audio)
+        var d = ((try? await durationLoad)?.seconds) ?? 0
+        if let t = (try? await videoLoad)?.first {
+            if let n = try? await t.load(.naturalSize) { natural = n }
+            // Measured against the picture: sound can run a few frames past it, and those would play black.
+            if let r = try? await t.load(.timeRange), r.end.isNumeric { d = max(0, min(d, r.end.seconds)) }
+        }
+        hasAudio = !((try? await audioLoad) ?? []).isEmpty
         duration = d
         s.clips = [VClip(start: 0, end: d)]
+        if let camAsset, let t = try? await camAsset.loadTracks(withMediaType: .video).first {
+            camRange = (try? await t.load(.timeRange)) ?? .zero
+        }
+        if let meta {
+            if cameraURL != nil { s.cam = meta.layout }
+            let clips = meta.clips.compactMap { c -> VClip? in
+                guard c.count >= 2, c[1] > c[0] else { return nil }
+                return VClip(start: max(0, c[0]), end: min(d, c[1]), cam: CamMode(rawValue: Int(c.count > 2 ? c[2] : 0)) ?? .bubble)
+            }
+            if !clips.isEmpty {
+                // Everything you recorded is still here: undo brings the cut retakes back.
+                if meta.removed > 0 || clips.count > 1 || clips.first.map({ $0.start > 0.05 || $0.end < d - 0.05 }) == true {
+                    var whole = s
+                    whole.clips = [VClip(start: 0, end: d)]
+                    undoStack = [whole]
+                }
+                s.clips = clips
+            }
+            if let c = meta.crop, c.count == 4 { s.crop = CGRect(x: c[0], y: c[1], width: c[2], height: c[3]) }
+            if meta.muted == true { s.muted = true }
+            if meta.linked == false, let segs = meta.segs {
+                s.camLinked = false
+                s.camSegs = segs.compactMap { g in
+                    guard g.count >= 3, g[1] > g[0] else { return nil }
+                    return CamSeg(start: g[0], end: min(d, g[1]), mode: CamMode(rawValue: Int(g[2])) ?? .bubble)
+                }
+                if s.camSegs.isEmpty { s.camLinked = true }
+            }
+        }
         base = s
         rebuild(keepTime: 0)
+        if let meta, meta.removed > 0 {
+            say(meta.removed == 1 ? "1 retake removed. ⌘Z brings it back." : "\(meta.removed) retakes removed. ⌘Z brings them back.")
+        }
         withAnimation(gentle) { ready = true }
         // A dense strip of frames from the source; each clip shows the ones from its own range.
         let gen = AVAssetImageGenerator(asset: asset)
@@ -132,12 +208,30 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
         gen.requestedTimeToleranceBefore = tol
         gen.requestedTimeToleranceAfter = tol
         let n = 40
-        var imgs: [NSImage] = []
-        for i in 0..<n {
-            let t = CMTime(seconds: d * (Double(i) + 0.5) / Double(n), preferredTimescale: 600)
-            if let r = try? await gen.image(at: t) { imgs.append(NSImage(cgImage: r.image, size: .zero)) }
+        guard d > 0 else { return }
+        // One batched request: the generator decodes forward through the file once, instead of 40 separate
+        // seek-and-decode round trips.
+        let times = (0..<n).map { CMTime(seconds: d * (Double($0) + 0.5) / Double(n), preferredTimescale: 600) }
+        var got: [(Double, NSImage)] = []
+        got.reserveCapacity(n)
+        for await r in gen.images(for: times) {
+            if case .success(let at, let cg, _) = r { got.append((at.seconds, NSImage(cgImage: cg, size: .zero))) }
         }
+        let imgs = got.sorted { $0.0 < $1.0 }.map(\.1)
         withAnimation(.easeOut(duration: 0.3)) { strip = imgs }
+        // Your camera gets its own small strip for the camera layer.
+        if let camAsset {
+            let cg = AVAssetImageGenerator(asset: camAsset)
+            cg.maximumSize = CGSize(width: 96, height: 96)
+            cg.requestedTimeToleranceBefore = tol
+            cg.requestedTimeToleranceAfter = tol
+            var cams: [NSImage] = []
+            for i in 0..<24 {
+                let t = CMTime(seconds: d * (Double(i) + 0.5) / 24, preferredTimescale: 600)
+                if let r = try? await cg.image(at: t) { cams.append(NSImage(cgImage: r.image, size: .zero)) }
+            }
+            withAnimation(.easeOut(duration: 0.3)) { camStrip = cams }
+        }
     }
 
     var dirty: Bool { ready && s != base }
@@ -184,6 +278,7 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
             s = st
             if !st.clips.contains(where: { $0.id == selectedClip }) { selectedClip = nil }
             if !st.notes.contains(where: { $0.id == selectedNote }) { selectedNote = nil }
+            if !st.camSegs.contains(where: { $0.id == selectedSeg }) { selectedSeg = nil }
         }
         player.isMuted = s.muted
         if clipsChanged { rebuild(keepTime: min(time, total)) }
@@ -200,6 +295,170 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
     func preview(_ t: Double) {
         player.seek(to: CMTime(seconds: max(0, t), preferredTimescale: 600),
                     toleranceBefore: CMTime(value: 1, timescale: 60), toleranceAfter: CMTime(value: 1, timescale: 60))
+        camPlayer?.seek(to: CMTime(seconds: max(0, t), preferredTimescale: 600),
+                        toleranceBefore: CMTime(value: 1, timescale: 30), toleranceAfter: CMTime(value: 1, timescale: 30))
+    }
+
+    // Camera
+    var hasCamera: Bool { camPlayer != nil }
+    /// The camera layer shows under the video once you click into it, open Camera, or unlink it.
+    var layersShown: Bool { hasCamera && (selectedClip != nil || selectedSeg != nil || cameraOpen || !s.camLinked) }
+
+    func camMode(atSource t: Double, clip i: Int) -> CamMode {
+        if s.camLinked { return s.clips.indices.contains(i) ? s.clips[i].cam : .bubble }
+        return s.camSegs.first { t >= $0.start - 0.0001 && t < $0.end }?.mode ?? .bubble
+    }
+    func camMode(at t: Double) -> CamMode {
+        guard let (i, off) = locate(t), s.clips.indices.contains(i) else { return .bubble }
+        return camMode(atSource: s.clips[i].start + off, clip: i)
+    }
+    /// The clip the camera controls act on: the selected one, or the one under the playhead.
+    private var camClipIndex: Int? {
+        if let id = selectedClip, let i = s.clips.firstIndex(where: { $0.id == id }) { return i }
+        return locate(time)?.0
+    }
+    /// The camera piece the controls act on when unlinked: the selected one, or the one under the playhead.
+    private var camSegIndex: Int? {
+        if let id = selectedSeg, let i = s.camSegs.firstIndex(where: { $0.id == id }) { return i }
+        guard let (i, off) = locate(time), s.clips.indices.contains(i) else { return nil }
+        let src = s.clips[i].start + off
+        return s.camSegs.firstIndex { src >= $0.start - 0.0001 && src < $0.end }
+    }
+    func camModeForControls(at t: Double) -> CamMode {
+        if !s.camLinked { return camSegIndex.map { s.camSegs[$0].mode } ?? .bubble }
+        if let i = camClipIndex, s.clips.indices.contains(i) { return s.clips[i].cam }
+        return camMode(at: t)
+    }
+    func setCamMode(_ md: CamMode) {
+        if !s.camLinked {
+            guard let i = camSegIndex, s.camSegs[i].mode != md else { return }
+            snapshot()
+            withAnimation(settle) { s.camSegs[i].mode = md }
+            say(md == .full ? "Only you, for this part" : md == .off ? "Camera hidden for this part" : "Camera back in its corner")
+            return
+        }
+        guard let i = camClipIndex, s.clips.indices.contains(i), s.clips[i].cam != md else { return }
+        snapshot()
+        withAnimation(settle) { s.clips[i].cam = md }
+        if s.clips.count > 1 {
+            say(md == .full ? "This clip shows only you" : md == .off ? "Camera hidden for this clip" : "Camera back in its corner")
+        }
+    }
+
+    /// Give the camera its own cuts. Its pieces start out exactly where the video's clips are.
+    func unlinkCamera() {
+        guard hasCamera, s.camLinked else { return }
+        snapshot()
+        var pts = Set([0, duration])
+        for c in s.clips { pts.insert(c.start); pts.insert(c.end) }
+        let p = pts.sorted()
+        var segs: [CamSeg] = []
+        for k in 0..<(p.count - 1) where p[k + 1] - p[k] > 0.01 {
+            let mid = (p[k] + p[k + 1]) / 2
+            let md = s.clips.first { mid >= $0.start && mid < $0.end }?.cam ?? .bubble
+            if let last = segs.last, last.mode == md, abs(last.end - p[k]) < 0.0001 { segs[segs.count - 1].end = p[k + 1] }
+            else { segs.append(CamSeg(start: p[k], end: p[k + 1], mode: md)) }
+        }
+        withAnimation(gentle) {
+            s.camSegs = segs
+            s.camLinked = false
+            if let id = selectedClip, let c = s.clips.first(where: { $0.id == id }) {
+                selectedSeg = segs.first { c.start + 0.001 >= $0.start && c.start < $0.end }?.id
+            }
+            selectedClip = nil
+        }
+        say("Camera unlinked. Split it to hide it or show only you for part of a clip.")
+    }
+
+    /// Back to one layer: each clip takes the camera setting from its middle.
+    func linkCamera() {
+        guard !s.camLinked else { return }
+        snapshot()
+        withAnimation(gentle) {
+            for i in s.clips.indices {
+                let mid = (s.clips[i].start + s.clips[i].end) / 2
+                s.clips[i].cam = s.camSegs.first { mid >= $0.start && mid < $0.end }?.mode ?? .bubble
+            }
+            s.camLinked = true
+            s.camSegs = []
+            selectedSeg = nil
+        }
+        say("Camera linked. Cuts take it along with the video.")
+    }
+
+    /// Cut only the camera layer at a point on the timeline.
+    func splitCamera(at t: Double) {
+        guard hasCamera, let (i, off) = locate(t), s.clips.indices.contains(i) else { return }
+        if s.camLinked { unlinkCamera() }
+        let src = s.clips[i].start + off
+        guard let k = s.camSegs.firstIndex(where: { src > $0.start && src < $0.end }) else { return }
+        let g = s.camSegs[k]
+        guard src - g.start > 0.08, g.end - src > 0.08 else { say("Too close to an edge to split"); return }
+        snapshot()
+        let b = CamSeg(start: src, end: g.end, mode: g.mode)
+        withAnimation(gentle) {
+            s.camSegs[k].end = src
+            s.camSegs.insert(b, at: k + 1)
+            selectedSeg = b.id
+            selectedClip = nil
+            selectedNote = nil
+        }
+    }
+
+    struct CamPiece: Identifiable { let id: String; let x: Double; let len: Double; let src: Double; let mode: CamMode; let clip: UUID?; let seg: UUID? }
+    /// The camera layer as drawn on the timeline, in output time.
+    func camPieces() -> [CamPiece] {
+        var out: [CamPiece] = []
+        var x = 0.0
+        for c in s.clips {
+            if s.camLinked {
+                out.append(CamPiece(id: c.id.uuidString, x: x, len: c.len, src: c.start, mode: c.cam, clip: c.id, seg: nil))
+            } else {
+                for g in s.camSegs where g.end > c.start && g.start < c.end {
+                    let a = max(c.start, g.start), b = min(c.end, g.end)
+                    out.append(CamPiece(id: g.id.uuidString + c.id.uuidString,
+                                        x: x + a - c.start, len: b - a, src: a, mode: g.mode, clip: nil, seg: g.id))
+                }
+            }
+            x += c.len
+        }
+        return out
+    }
+
+    /// What gets rendered: each clip, cut further wherever the unlinked camera changes.
+    func renderClips() -> [Present.RenderClip] {
+        if s.camLinked { return s.clips.map { .init(start: $0.start, end: $0.end, mode: $0.cam) } }
+        var out: [Present.RenderClip] = []
+        for c in s.clips {
+            var a = c.start
+            for g in s.camSegs where g.end > c.start && g.start < c.end {
+                let b = min(c.end, g.end)
+                if b - a > 0.001 { out.append(.init(start: a, end: b, mode: g.mode)) }
+                a = b
+            }
+            if c.end - a > 0.001 { out.append(.init(start: a, end: c.end, mode: .bubble)) }
+        }
+        return out
+    }
+    func setCam(_ change: (inout CamLayout) -> Void) {
+        var l = s.cam ?? CamLayout()
+        change(&l)
+        guard l != s.cam else { return }
+        snapshot()
+        withAnimation(settle) { s.cam = l }
+        CamLayout.saved = l
+    }
+    func toggleCamera() {
+        withAnimation(snappy) {
+            cameraOpen.toggle()
+            if cameraOpen {
+                markupOpen = false; tool = nil; if mode == .crop { applyCrop() }
+                // Open on the camera layer, with the part under the playhead picked.
+                if selectedClip == nil && selectedSeg == nil {
+                    if s.camLinked { selectedClip = camClipIndex.map { s.clips[$0].id } } else { selectedSeg = camSegIndex.map { s.camSegs[$0].id } }
+                }
+            }
+        }
     }
 
     func say(_ text: String) {
@@ -226,35 +485,96 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
                 cur = cur + r.duration
             }
             guard let self, !Task.isCancelled else { return }
+            var camItem: AVPlayerItem?
+            if let ca = self.camAsset, let ct = try? await ca.loadTracks(withMediaType: .video).first {
+                let cc = AVMutableComposition()
+                if let t = cc.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
+                    var at = CMTime.zero
+                    for c in clips {
+                        let r = CMTimeRange(start: CMTime(seconds: c.start, preferredTimescale: 6000), end: CMTime(seconds: c.end, preferredTimescale: 6000))
+                        Present.place(ct, range: r, available: self.camRange, into: t, at: at)
+                        at = at + r.duration
+                    }
+                }
+                camItem = AVPlayerItem(asset: cc)
+            }
+            guard !Task.isCancelled else { return }
             let wasPlaying = self.playing
             self.player.replaceCurrentItem(with: AVPlayerItem(asset: comp))
+            if let camItem { self.camPlayer?.replaceCurrentItem(with: camItem) }
             self.seek(min(keepTime, self.total))
-            if wasPlaying { self.player.play() }
+            if wasPlaying { self.play() }
         }
     }
 
     private func tick(_ t: Double) {
         guard !t.isNaN else { return }
+        // While paused and scrubbing, `seek` already set the time; the landing of an older queued seek must not
+        // pull the playhead back. (Only paused ticks are skipped, so the camera sync below is untouched.)
+        if !playing, seekInFlight { return }
         let v = min(t, total)
         if abs(v - time) > 0.0005 { time = v }
-        if playing, player.rate == 0, time >= total - 0.05 { playing = false }
+        if playing, player.rate == 0, time >= total - 0.05 { playing = false; camPlayer?.pause() }
+        // Keep your camera on the same frame as the screen.
+        // Re-sync on the host clock rather than with an exact seek, which stalls on the camera's keyframes.
+        if playing, let cp = camPlayer, abs(cp.currentTime().seconds - v) > 0.15, abs(v - lastResync) > 1 {
+            lastResync = v
+            let lead = CMTime(value: 1, timescale: 15)
+            cp.setRate(1, time: CMTime(seconds: v, preferredTimescale: 6000) + lead, atHostTime: CMClockGetTime(CMClockGetHostTimeClock()) + lead)
+        }
     }
 
     func togglePlay() { playing ? pause() : play() }
     func play() {
         guard ready else { return }
         if time >= total - 0.05 { seek(0) }
-        player.play()
+        if let cp = camPlayer {
+            // Start both on the same host time so the camera does not drift from the slides.
+            player.automaticallyWaitsToMinimizeStalling = false
+            cp.automaticallyWaitsToMinimizeStalling = false
+            let now = CMClockGetTime(CMClockGetHostTimeClock()) + CMTime(value: 1, timescale: 20)
+            let at = CMTime(seconds: time, preferredTimescale: 6000)
+            player.setRate(1, time: at, atHostTime: now)
+            cp.setRate(1, time: at, atHostTime: now)
+        } else {
+            player.play()
+        }
         playing = true
     }
     func pause() {
         player.pause()
+        camPlayer?.pause()
         playing = false
     }
     func seek(_ t: Double) {
         let v = min(max(0, t), total)
         time = v
-        player.seek(to: CMTime(seconds: v, preferredTimescale: 6000), toleranceBefore: .zero, toleranceAfter: .zero)
+        chaseSeek(CMTime(seconds: v, preferredTimescale: 6000))
+        camPlayer?.seek(to: CMTime(seconds: v, preferredTimescale: 6000), toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    /// Scrubbing fires a frame-exact seek per pointer event. AVPlayer cancels a seek when the next one arrives, so
+    /// during a fast drag no seek ever finished and the picture froze until the pointer stopped. Here only one seek
+    /// is in flight; newer targets replace the queued one and run when it lands, so the frame keeps up with the
+    /// playhead and always ends on the exact last position (Apple's "chase seek", QA1820).
+    private var seekTarget: CMTime?
+    private var seekInFlight = false
+    private func chaseSeek(_ t: CMTime) {
+        guard player.currentItem != nil else {        // nothing to seek yet (the composition is still being built)
+            player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
+            return
+        }
+        seekTarget = t
+        guard !seekInFlight else { return }
+        nextSeek()
+    }
+    private func nextSeek() {
+        guard let t = seekTarget else { seekInFlight = false; return }
+        seekTarget = nil
+        seekInFlight = true
+        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            Task { @MainActor in self?.nextSeek() }
+        }
     }
     func step(_ d: Double) {
         pause()
@@ -274,7 +594,7 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
         snapshot()
         var a = c
         a.end = c.start + off
-        let b = VClip(start: c.start + off, end: c.end)
+        let b = VClip(start: c.start + off, end: c.end, cam: c.cam)
         withAnimation(gentle) {
             s.clips[i] = a
             s.clips.insert(b, at: i + 1)
@@ -416,13 +736,14 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
     func pick(_ t: MarkTool?) {
         withAnimation(snappy) {
             tool = t
-            if t != nil { markupOpen = true; if mode == .crop { applyCrop() }; mode = .edit }
+            if t != nil { markupOpen = true; cameraOpen = false; if mode == .crop { applyCrop() }; mode = .edit }
         }
     }
 
     // Export: the clips in order, cropped, annotations burned in. Returns the new file.
     func export() async throws -> URL {
         guard !s.clips.isEmpty else { throw CocoaError(.fileWriteUnknown) }
+        if meta != nil { return try await exportPresentation() }
         let comp = AVMutableComposition()
         var cursor = CMTime.zero
         for c in s.clips {
@@ -500,6 +821,28 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
         return out
     }
 
+    /// A presentation saves through the same compositor that made it, so the camera can keep moving later.
+    private func exportPresentation() async throws -> URL {
+        let total = self.total
+        let notes = s.notes.filter { $0.start < total && $0.end > 0 }.compactMap { n in render(n.mark).map { ($0, n.start, n.end) } }
+        let out = Recordings.sibling(url, "edited")
+        let layout = s.cam ?? meta?.layout ?? CamLayout()
+        try await Present.render(screen: screenURL, camera: cameraURL, clips: renderClips(),
+                                 layout: layout, notes: notes, crop: s.crop, muted: s.muted, to: out)
+        var final = out
+        if !RecPrefs.keepOriginal, (try? FileManager.default.replaceItemAt(url, withItemAt: out)) != nil { final = url }
+        var m = meta ?? PresentMeta(screen: screenURL.lastPathComponent, camera: cameraURL?.lastPathComponent, layout: layout, clips: [])
+        m.layout = layout
+        m.clips = s.clips.map { [$0.start, $0.end, Double($0.cam.rawValue)] }
+        m.removed = 0
+        m.crop = s.crop.map { [$0.minX, $0.minY, $0.width, $0.height] }
+        m.muted = s.muted
+        m.linked = s.camLinked
+        m.segs = s.camLinked ? nil : s.camSegs.map { [$0.start, $0.end, Double($0.mode.rawValue)] }
+        Present.save(m, for: final)
+        return final
+    }
+
     private func render(_ m: Mark) -> CGImage? {
         let size = natural
         let r = ImageRenderer(content: Canvas { ctx, s in drawMarks(ctx, size: s, marks: [m], pixelated: nil) }
@@ -518,11 +861,12 @@ final class PlayerNSView: NSView {
 
 struct PlayerSurface: NSViewRepresentable {
     let player: AVPlayer
+    var gravity: AVLayerVideoGravity = .resize
     func makeNSView(context: Context) -> PlayerNSView {
         let v = PlayerNSView()
         v.wantsLayer = true
         (v.layer as? AVPlayerLayer)?.player = player
-        (v.layer as? AVPlayerLayer)?.videoGravity = .resize
+        (v.layer as? AVPlayerLayer)?.videoGravity = gravity
         return v
     }
     func updateNSView(_ v: PlayerNSView, context: Context) {}
@@ -538,7 +882,7 @@ struct VideoEditorView: View {
                 .onTapGesture {
                     if m.mode == .crop { m.applyCrop(); return }
                     if m.editingText != nil { m.commitText() }
-                    withAnimation(snappy) { m.selectedClip = nil; m.selectedNote = nil }
+                    withAnimation(snappy) { m.selectedClip = nil; m.selectedNote = nil; m.selectedSeg = nil }
                 }
             VStack(spacing: 0) {
                 GeometryReader { geo in
@@ -548,10 +892,12 @@ struct VideoEditorView: View {
                 .padding(.horizontal, 32).padding(.top, 44)
                 ContextBar(m: m).frame(height: 46)
                 TimelineView2(m: m)
-                    .frame(height: 118)
+                    .frame(height: m.layersShown ? 154 : 118)
+                    .animation(gentle, value: m.layersShown)
                     .padding(.horizontal, 24)
                 VStack(spacing: 8) {
                     if m.markupOpen { MarkupTray(m: m).transition(.modifier(active: Pop(s: 0.94, b: 6, o: 0, y: 10), identity: .rest)) }
+                    if m.cameraOpen { CameraTray(m: m, clock: m.clock).transition(.modifier(active: Pop(s: 0.94, b: 6, o: 0, y: 10), identity: .rest)) }
                     EditorBar(m: m, done: done)
                 }
                 .padding(.top, 10).padding(.bottom, 18)
@@ -573,6 +919,7 @@ struct VideoEditorView: View {
         }
         .environment(\.colorScheme, .dark)
         .animation(gentle, value: m.markupOpen)
+        .animation(gentle, value: m.cameraOpen)
     }
 }
 
@@ -598,9 +945,17 @@ struct StageView: View {
                 .offset(x: -c.minX * inner.width, y: -c.minY * inner.height)
         }
         .frame(width: fit.width, height: fit.height, alignment: .topLeading)
+        .overlay(alignment: .topLeading) {
+            if m.hasCamera && m.mode != .crop {
+                CamOverlay(m: m, clock: m.clock, area: CGRect(origin: .zero, size: fit))
+                    .transition(.opacity)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.white.opacity(0.08), lineWidth: 1))
-        .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
+        // A shape shadow, not .shadow: the latter is computed from the rendered contents, so every video frame and
+        // every 30 Hz annotation redraw paid for an offscreen 24pt blur of the whole stage during playback.
+        .background(ShapeShadow(shape: RoundedRectangle(cornerRadius: 10, style: .continuous), color: .black.opacity(0.5), radius: 24, y: 12))
         .opacity(m.ready ? 1 : 0)
         .scaleEffect(m.ready ? 1 : 0.97)
     }
@@ -847,10 +1202,27 @@ struct ContextBar: View {
                     action("Delete", "⌫", destructive: true) { m.deleteSelection() }
                 }
                 .transition(.modifier(active: Pop(s: 0.95, b: 6, o: 0, y: 6), identity: .rest))
+            } else if let id = m.selectedSeg, let g = m.s.camSegs.first(where: { $0.id == id }) {
+                pill {
+                    Image(systemName: "person.crop.square").foregroundStyle(.white.opacity(0.6))
+                    Text(Recordings.precise(g.end - g.start)).monospacedDigit().foregroundStyle(.white.opacity(0.6))
+                    divider
+                    camModes(g.mode)
+                    divider
+                    action("Split camera", "Cut only the camera at the playhead  S") { m.splitCamera(at: m.time) }
+                }
+                .transition(.modifier(active: Pop(s: 0.95, b: 6, o: 0, y: 6), identity: .rest))
             } else if let id = m.selectedClip, let i = m.s.clips.firstIndex(where: { $0.id == id }) {
                 pill {
                     Text(Recordings.precise(m.s.clips[i].len)).monospacedDigit().foregroundStyle(.white.opacity(0.6))
-                    action("Delete clip", "⌫", destructive: true) { m.deleteSelection() }
+                    if m.hasCamera && m.s.camLinked {
+                        divider
+                        camModes(m.s.clips[i].cam)
+                    }
+                    if m.s.clips.count > 1 {
+                        divider
+                        action("Delete clip", "⌫", destructive: true) { m.deleteSelection() }
+                    }
                 }
                 .transition(.modifier(active: Pop(s: 0.95, b: 6, o: 0, y: 6), identity: .rest))
             }
@@ -859,6 +1231,33 @@ struct ContextBar: View {
         .animation(gentle, value: m.mode)
         .animation(gentle, value: m.selectedClip)
         .animation(gentle, value: m.selectedNote)
+        .animation(gentle, value: m.selectedSeg)
+    }
+
+    var divider: some View { Rectangle().fill(.white.opacity(0.15)).frame(width: 1, height: 16) }
+
+    /// Bubble, only you, or hidden: for the selected clip, or the selected piece of an unlinked camera.
+    func camModes(_ current: CamMode) -> some View {
+        HStack(spacing: 2) {
+            ForEach(CamMode.allCases, id: \.self) { md in
+                let on = current == md
+                Button { m.setCamMode(md) } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: md.symbol).font(.system(size: 10.5, weight: .bold))
+                        Text(md.label)
+                    }
+                    .foregroundStyle(on ? onAccent : Color.white.opacity(0.85))
+                    .padding(.horizontal, 10).frame(height: 26)
+                    .background(Capsule().fill(on ? accent : Color.clear))
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(Squish())
+                .help(md == .bubble ? "Your camera in its corner" : md == .full ? "Only you, full frame" : "Hide your camera here")
+            }
+        }
+        .padding(2)
+        .background(Capsule().fill(Color.white.opacity(0.06)))
+        .animation(gentle, value: current)
     }
 
     var cropControls: some View {
@@ -905,7 +1304,8 @@ struct TimelineView2: View {
     @State private var noteDrag: (id: UUID, start: Double, end: Double)?
     @State private var bladeX: CGFloat?
 
-    let rulerH: CGFloat = 20, clipH: CGFloat = 56, laneH: CGFloat = 22
+    let rulerH: CGFloat = 20, clipH: CGFloat = 56, laneH: CGFloat = 22, camH: CGFloat = 30
+    var camGap: CGFloat { m.layersShown ? camH + 6 : 0 }
 
     var body: some View {
         GeometryReader { g in
@@ -916,8 +1316,13 @@ struct TimelineView2: View {
                 ruler(W, pps)
                 clipsRow(W, pps)
                     .offset(y: rulerH)
+                if m.layersShown {
+                    camLane(W, pps)
+                        .offset(y: rulerH + clipH + 6)
+                        .transition(.modifier(active: Pop(s: 0.98, b: 4, o: 0, y: -10), identity: .rest))
+                }
                 lane(W, pps)
-                    .offset(y: rulerH + clipH + 10)
+                    .offset(y: rulerH + clipH + 10 + camGap)
                 if m.mode == .blade, let bx = bladeX {
                     let snapped = abs(bx - x(m.time)) < 10
                     let px = snapped ? x(m.time) : bx
@@ -930,7 +1335,7 @@ struct TimelineView2: View {
                         .offset(x: px - 1, y: rulerH - 6)
                         .allowsHitTesting(false)
                 }
-                PlayheadView(clock: m.clock, pps: pps, height: rulerH + clipH + laneH + 14)
+                PlayheadView(clock: m.clock, pps: pps, height: rulerH + clipH + laneH + 14 + camGap)
             }
             .frame(width: W, height: g.size.height, alignment: .topLeading)
             .coordinateSpace(name: "tl")
@@ -1003,9 +1408,11 @@ struct TimelineView2: View {
                 return
             }
             if abs(v.translation.width) < 3 {
-                withAnimation(snappy) {
+                withAnimation(gentle) {
                     m.selectedNote = nil
-                    if m.s.clips.count > 1, let (i, _) = m.locate(t) { m.selectedClip = m.s.clips[i].id } else { m.selectedClip = nil }
+                    m.selectedSeg = nil
+                    // Clicking into a recording with a camera opens its camera layer.
+                    if m.s.clips.count > 1 || m.hasCamera, let (i, _) = m.locate(t) { m.selectedClip = m.s.clips[i].id } else { m.selectedClip = nil }
                 }
             }
         })
@@ -1059,6 +1466,59 @@ struct TimelineView2: View {
                 withAnimation(gentle) { frozenPPS = nil }
                 m.rebuild(keepTime: left ? m.outStart(i) : m.outStart(i) + (m.s.clips.first { $0.id == c.id }?.len ?? 0) - 0.03)
             })
+    }
+
+    /// Your camera, as its own layer under the video. Linked, its pieces are the video's clips; unlinked, it has its own cuts.
+    func camLane(_ W: CGFloat, _ pps: CGFloat) -> some View {
+        let pieces = m.camPieces()
+        return ZStack(alignment: .topLeading) {
+            ForEach(pieces) { p in
+                CamPieceView(m: m, piece: p, width: max(4, CGFloat(p.len) * pps),
+                             selected: p.clip.map { $0 == m.selectedClip } ?? (p.seg == m.selectedSeg && p.seg != nil))
+                    .offset(x: CGFloat(p.x) * pps)
+                    .transition(.modifier(active: Pop(s: 0.9, b: 4, o: 0), identity: .rest))
+            }
+            Button { m.s.camLinked ? m.unlinkCamera() : m.linkCamera() } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: m.s.camLinked ? "link" : "link.badge.plus").font(.system(size: 10, weight: .bold))
+                    Text(m.s.camLinked ? "Linked" : "Link").font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(m.s.camLinked ? Color.white.opacity(0.85) : onAccent)
+                .padding(.horizontal, 9).frame(height: 22)
+                .background(Capsule().fill(m.s.camLinked ? Color.black.opacity(0.6) : accent))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(Squish())
+            .help(m.s.camLinked ? "Your camera moves with every cut. Click to give it its own cuts."
+                                : "Your camera has its own cuts. Click to make it follow the video again.")
+            .offset(x: 4, y: 4)
+            .animation(gentle, value: m.s.camLinked)
+        }
+        .frame(width: W, height: camH, alignment: .topLeading)
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 0).onChanged { v in
+            guard m.mode != .blade else { return }
+            m.pause()
+            m.seek(Double(min(max(0, v.location.x), W) / pps))
+        }.onEnded { v in
+            let t = Double(min(max(0, v.location.x), W) / pps)
+            if m.mode == .blade {
+                let snapped = abs(v.location.x - CGFloat(m.time) * pps) < 10
+                m.splitCamera(at: snapped ? m.time : t)
+                if !snapped { m.seek(t) }
+                withAnimation(gentle) { m.mode = .edit }
+                NSCursor.arrow.set()
+                return
+            }
+            guard abs(v.translation.width) < 3, let p = pieces.first(where: { t >= $0.x && t < $0.x + $0.len }) ?? pieces.last else { return }
+            withAnimation(gentle) {
+                m.selectedNote = nil
+                if let c = p.clip { m.selectedClip = c; m.selectedSeg = nil } else { m.selectedSeg = p.seg; m.selectedClip = nil }
+            }
+        })
+        .onContinuousHover { phase in
+            if case .active = phase, m.mode == .blade { NSCursor.blade.set() }
+        }
     }
 
     func lane(_ W: CGFloat, _ pps: CGFloat) -> some View {
@@ -1157,7 +1617,61 @@ struct ClipBlock: View {
         .frame(width: max(1, width - 3), height: h)
         .clipShape(shape)
         .overlay(shape.strokeBorder(selected ? accent : Color.white.opacity(0.12), lineWidth: selected ? 2.5 : 1))
+        .overlay(alignment: .topLeading) {
+            if m.hasCamera && clip.cam != .bubble && width > 34 {
+                Image(systemName: clip.cam.symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                    .frame(width: 20, height: 18).background(Capsule().fill(.black.opacity(0.55)))
+                    .padding(5)
+                    .transition(.modifier(active: Pop(s: 0.6, b: 4, o: 0), identity: .rest))
+                    .help(clip.cam == .full ? "Only your camera in this clip" : "Camera hidden in this clip")
+            }
+        }
+        .animation(settle, value: clip.cam)
         .brightness(selected ? 0.04 : 0)
+    }
+}
+
+/// One piece of the camera layer: small frames of you, and what the camera does there.
+struct CamPieceView: View {
+    @ObservedObject var m: VideoEditorModel
+    let piece: VideoEditorModel.CamPiece
+    let width: CGFloat
+    let selected: Bool
+
+    var body: some View {
+        let h: CGFloat = 30
+        let tileW = h * 4 / 3
+        let n = max(1, Int((width / tileW).rounded(.up)))
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        let off = piece.mode == .off
+        ZStack(alignment: .leading) {
+            HStack(spacing: 0) {
+                ForEach(0..<n, id: \.self) { k in
+                    let t = piece.src + (Double(k) + 0.5) / Double(n) * piece.len
+                    let idx = m.camStrip.isEmpty ? nil : min(m.camStrip.count - 1, max(0, Int(t / max(m.duration, 0.001) * Double(m.camStrip.count))))
+                    ZStack {
+                        Color.white.opacity(0.06)
+                        if let idx { Image(nsImage: m.camStrip[idx]).resizable().aspectRatio(contentMode: .fill) }
+                    }
+                    .frame(width: width / CGFloat(n), height: h).clipped()
+                }
+            }
+            .opacity(off ? 0.18 : 1)
+            .saturation(off ? 0 : 1)
+            if piece.mode == .full { accent.opacity(0.28) }
+            if piece.mode != .bubble && width > 30 {
+                Image(systemName: piece.mode.symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                    .frame(width: 22, height: 18).background(Capsule().fill(.black.opacity(0.6)))
+                    .padding(.leading, piece.x < 0.01 && m.s.camLinked ? 76 : 5)
+                    .transition(.modifier(active: Pop(s: 0.6, b: 4, o: 0), identity: .rest))
+            }
+        }
+        .frame(width: max(1, width - 3), height: h)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(selected ? accent : Color.white.opacity(off ? 0.18 : 0.12),
+                                    style: StrokeStyle(lineWidth: selected ? 2 : 1, dash: off && !selected ? [4, 3] : [])))
+        .animation(settle, value: piece.mode)
+        .help(piece.mode == .off ? "Camera hidden here" : piece.mode == .full ? "Only you here" : "Your camera in its corner")
     }
 }
 
@@ -1212,7 +1726,7 @@ struct EditorBar: View {
             .buttonStyle(Squish()).help(m.playing ? "Pause  Space" : "Play  Space")
             TimeLabel(clock: m.clock, total: m.total)
             sep
-            Button { withAnimation(gentle) { m.mode = m.mode == .blade ? .edit : .blade; m.tool = nil; m.markupOpen = false } } label: {
+            Button { withAnimation(gentle) { m.mode = m.mode == .blade ? .edit : .blade; m.tool = nil; m.markupOpen = false; m.cameraOpen = false } } label: {
                 HStack(spacing: 7) {
                     SplitGlyph()
                     Text("Split").font(.system(size: 12.5, weight: .semibold))
@@ -1226,11 +1740,15 @@ struct EditorBar: View {
             labeled("crop", "Crop", "Crop the frame. Nothing is cut away.  C", on: m.mode == .crop) {
                 if m.mode == .crop { m.applyCrop() } else { m.enterCrop() }
             }
+            sep
             labeled("pencil.tip", "Annotate", "Arrows, boxes, text and steps over the video", on: m.markupOpen) {
                 withAnimation(gentle) {
                     m.markupOpen.toggle()
-                    if !m.markupOpen { m.tool = nil } else { m.tool = m.tool ?? .arrow; if m.mode == .crop { m.applyCrop() }; m.mode = .edit }
+                    if !m.markupOpen { m.tool = nil } else { m.cameraOpen = false; m.tool = m.tool ?? .arrow; if m.mode == .crop { m.applyCrop() }; m.mode = .edit }
                 }
+            }
+            if m.hasCamera {
+                labeled("person.crop.square", "Camera", "Shape, size and when your camera shows", on: m.cameraOpen) { m.toggleCamera() }
             }
             if m.hasAudio {
                 labeled(m.s.muted ? "speaker.slash.fill" : "speaker.wave.2.fill", m.s.muted ? "Muted" : "Sound",
@@ -1340,7 +1858,10 @@ struct EditorBar: View {
         case 53: escape(); return nil
         case 36, 76: if m.mode == .crop { m.applyCrop() } else { finish() }; return nil
         case 49: m.togglePlay(); return nil
-        case 51, 117: m.deleteSelection(); return nil
+        case 51, 117:
+            // A camera piece cannot be cut out of the video; deleting it hides the camera there.
+            if m.selectedSeg != nil { m.setCamMode(.off) } else { m.deleteSelection() }
+            return nil
         case 123: m.step(f.contains(.shift) ? -1 : -1.0 / 30); return nil
         case 124: m.step(f.contains(.shift) ? 1 : 1.0 / 30); return nil
         case 126: m.jumpBoundary(false); return nil
@@ -1348,7 +1869,7 @@ struct EditorBar: View {
         default: break
         }
         switch ch {
-        case "s": m.split(at: m.time); return nil
+        case "s": if m.selectedSeg != nil { m.splitCamera(at: m.time) } else { m.split(at: m.time) }; return nil
         case "b": withAnimation(gentle) { m.mode = m.mode == .blade ? .edit : .blade; m.tool = nil }; return nil
         case "c": if m.mode == .crop { m.applyCrop() } else { m.enterCrop() }; return nil
         case "m": if m.hasAudio { m.toggleMute() }; return nil
@@ -1365,8 +1886,10 @@ struct EditorBar: View {
         guard let m = model else { return }
         if m.mode == .crop { m.applyCrop(); return }
         if m.mode == .blade { withAnimation(gentle) { m.mode = .edit }; return }
-        if m.tool != nil || m.markupOpen { withAnimation(gentle) { m.tool = nil; m.markupOpen = false }; return }
-        if m.selectedClip != nil || m.selectedNote != nil { withAnimation(snappy) { m.selectedClip = nil; m.selectedNote = nil }; return }
+        if m.tool != nil || m.markupOpen || m.cameraOpen { withAnimation(gentle) { m.tool = nil; m.markupOpen = false; m.cameraOpen = false }; return }
+        if m.selectedClip != nil || m.selectedNote != nil || m.selectedSeg != nil {
+            withAnimation(gentle) { m.selectedClip = nil; m.selectedNote = nil; m.selectedSeg = nil }; return
+        }
         requestClose()
     }
 

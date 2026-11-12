@@ -21,6 +21,20 @@ enum ClipTools {
         return (img, dur, size)
     }
 
+    /// What the clip card shows: the length and one small frame, read together. Skips the track and size reads
+    /// `info` does, and the frame is sized for the 290pt card at 2x.
+    static func poster(_ url: URL) async -> (NSImage?, Double) {
+        let asset = AVURLAsset(url: url)
+        let gen = AVAssetImageGenerator(asset: asset)
+        gen.appliesPreferredTrackTransform = true
+        gen.maximumSize = CGSize(width: 600, height: 600)
+        async let durLoad = asset.load(.duration)
+        async let frame = gen.image(at: CMTime(seconds: 0.2, preferredTimescale: 600))
+        let img = (try? await frame).map { NSImage(cgImage: $0.image, size: .zero) }
+        let dur = ((try? await durLoad)?.seconds) ?? 0
+        return (img, dur)
+    }
+
     /// A looping GIF, sized for GitHub, Linear and Slack: up to 900px wide, 12 frames a second.
     static func gif(_ url: URL) async -> URL? {
         let asset = AVURLAsset(url: url)
@@ -38,10 +52,25 @@ enum ClipTools {
         CGImageDestinationSetProperties(dst, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
         let frameProps = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 1 / fps,
                                                           kCGImagePropertyGIFUnclampedDelayTime: 1 / fps]] as CFDictionary
-        for i in 0..<n {
-            let t = CMTime(seconds: Double(i) / fps, preferredTimescale: 600)
-            if let r = try? await gen.image(at: t) { CGImageDestinationAddImage(dst, r.image, frameProps) }
+        // One batched, in-order request: the generator decodes forward through the clip once instead of seeking
+        // and decoding from the nearest keyframe for every one of up to 360 frames. Frames are encoded as they arrive,
+        // so memory stays at a frame or two.
+        let times = (0..<n).map { CMTime(seconds: Double($0) / fps, preferredTimescale: 600) }
+        var pending: [Int: CGImage?] = [:]     // only holds anything if results ever arrive out of order
+        var next = 0
+        for await r in gen.images(for: times) {
+            let i: Int, img: CGImage?
+            switch r {
+            case .success(let at, let cg, _): i = Int((at.seconds * fps).rounded()); img = cg
+            case .failure(let at, _): i = Int((at.seconds * fps).rounded()); img = nil
+            }
+            pending[i] = .some(img)
+            while let entry = pending.removeValue(forKey: next) {
+                if let cg = entry { CGImageDestinationAddImage(dst, cg, frameProps) }
+                next += 1
+            }
         }
+        for k in pending.keys.sorted() { if let cg = pending[k] ?? nil { CGImageDestinationAddImage(dst, cg, frameProps) } }
         return CGImageDestinationFinalize(dst) ? out : nil
     }
 
@@ -85,20 +114,26 @@ enum ClipTools {
     private var panel: NSPanel?
     private var card: ClipCard?
     private var hideTask: Task<Void, Never>?
+    private var posterTask: Task<Void, Never>?
     private var hovering = false
     var onEdit: (URL) -> Void = { _ in }
 
     func show(_ url: URL, status: String = "Copied") {
         let c = card ?? ClipCard(url: url)
+        // Never let a slower read for an earlier clip (the "Preparing" file) land on top of this one, and do not
+        // show the previous clip's frame while this one loads. (The same URL is re-read: a save can replace it.)
+        if c.url != url && !c.busy { c.poster = nil; c.duration = 0 }   // after "Preparing", keep its frame until the final one lands
+        posterTask?.cancel()
+        posterTask = Task {
+            let (img, dur) = await ClipTools.poster(url)
+            guard !Task.isCancelled, c.url == url else { return }
+            c.poster = img
+            c.duration = dur
+        }
         c.url = url
         c.status = status
         c.busy = false
         card = c
-        Task {
-            let (img, dur, _) = await ClipTools.info(url)
-            c.poster = img
-            c.duration = dur
-        }
         if panel == nil {
             let host = NSHostingView(rootView: ClipCardView(c: c, ctl: self))
             let size = CGSize(width: 330, height: 290)
@@ -137,6 +172,12 @@ enum ClipTools {
             guard let self, !Task.isCancelled, !self.hovering, !(self.card?.busy ?? false) else { return }
             self.hide()
         }
+    }
+
+    /// A busy card while a recording is being finished, so Stop always answers at once.
+    func preparing(_ url: URL, _ text: String) {
+        show(url, status: text)
+        card?.busy = true
     }
 
     func hide() {

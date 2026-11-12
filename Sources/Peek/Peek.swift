@@ -42,12 +42,16 @@ let palette: [Color] = [
 /// The website's type, bundled with the app (Geist, SIL Open Font License). Used for the setup wizard and
 /// Library headings; small working UI stays on the system font. Falls back to the system font when run unbundled.
 enum Brand {
-    static func registerFonts() {
+    /// Registered the first time a Brand font is asked for (the Library or Setup opening), not at launch:
+    /// the tray, the editors and the recorder never use them, so launch skips four font registrations.
+    private static let registered: Void = {
         for n in ["Geist-Regular", "Geist-Medium", "Geist-SemiBold", "Geist-Bold"] {
             if let u = Bundle.main.url(forResource: n, withExtension: "ttf") { CTFontManagerRegisterFontsForURL(u as CFURL, .process, nil) }
         }
-    }
+    }()
+    static func registerFonts() { _ = registered }
     static func font(_ size: CGFloat, _ w: Font.Weight = .regular) -> Font {
+        registerFonts()
         let name = w == .bold || w == .heavy || w == .black ? "Geist-Bold"
             : (w == .semibold ? "Geist-SemiBold" : (w == .medium ? "Geist-Medium" : "Geist-Regular"))
         return .custom(name, size: size)
@@ -1650,7 +1654,9 @@ struct EditorView: View {
                     .frame(width: fit.width, height: fit.height)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.white.opacity(0.1), lineWidth: 0.5))
-                    .shadow(color: .black.opacity(0.45), radius: 30, y: 16)
+                    // A shape shadow: .shadow here re-rasterized the 30pt blur of the whole canvas on every drawing event.
+                    .background(ShapeShadow(shape: RoundedRectangle(cornerRadius: 10, style: .continuous),
+                                            color: .black.opacity(0.45), radius: 30, y: 16))
                     .scaleEffect(appeared ? 1 : 0.95)
                     .opacity(appeared ? 1 : 0)
                     .position(x: geo.size.width / 2, y: 44 + avail.height / 2)
@@ -2399,13 +2405,16 @@ struct LibraryView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.bottom, 60)
         } else {
+            // Selection order is looked up once per change, not once per tile (Command-A on 240 tiles was 240 x 240).
+            let order = Dictionary(m.selection.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+            let multi = m.selection.count > 1
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 30) {
                     ForEach(m.sections) { sec in
                         VStack(alignment: .leading, spacing: 12) {
                             Text(sec.title.uppercased()).font(.system(size: 11.5, weight: .semibold)).tracking(1.1).foregroundStyle(ink.opacity(0.45))
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 186), spacing: 14)], spacing: 14) {
-                                ForEach(sec.items) { LibTile(item: $0, m: m) }
+                                ForEach(sec.items) { LibTile(item: $0, m: m, order: order[$0.url], multi: multi) }
                             }
                         }
                     }
@@ -2419,20 +2428,38 @@ struct LibraryView: View {
     }
 }
 
+/// Share menu entries depend only on the file type, and asking macOS for them queries every share extension.
+/// The menu is built with the tile, so without this every tile body evaluation paid for that query.
+@MainActor enum ShareServices {
+    private static var byType: [String: [NSSharingService]] = [:]
+    static func `for`(_ u: URL) -> [NSSharingService] {
+        let k = u.pathExtension.lowercased()
+        if let s = byType[k] { return s }
+        let s = NSSharingService.sharingServices(forItems: [u])
+        byType[k] = s
+        return s
+    }
+}
+
+/// Does not observe the Library model: the parent hands in this tile's place in the selection, so a click
+/// re-renders only the tiles whose ring or badge actually changed.
 struct LibTile: View {
     let item: LibItem
-    @ObservedObject var m: LibraryModel
+    let m: LibraryModel
+    let order: Int?
+    let multi: Bool
     @State private var hover = false
     @State private var thumb: NSImage?
 
-    init(item: LibItem, m: LibraryModel) {
+    init(item: LibItem, m: LibraryModel, order: Int?, multi: Bool) {
         self.item = item
         self.m = m
+        self.order = order
+        self.multi = multi
         _thumb = State(initialValue: ThumbCache.shared.cached(item.url, item.date))   // no fade for anything already decoded
     }
 
     var body: some View {
-        let order = m.selection.firstIndex(of: item.url)
         let on = order != nil
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         let video = isVideoFile(item.url)
@@ -2450,7 +2477,7 @@ struct LibTile: View {
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(on ? accent : ink.opacity(hover ? 0.16 : 0.08), lineWidth: on ? 3 : 1))
             .overlay(alignment: .topLeading) {
-                if let order { OrderBadge(n: m.selection.count > 1 ? order + 1 : nil).padding(8).transition(.pop) }
+                if let order { OrderBadge(n: multi ? order + 1 : nil).padding(8).transition(.pop) }
             }
             .overlay(alignment: .topTrailing) {
                 if hover { RoundButton(symbol: video ? "scissors" : "pencil.tip", help: video ? "Edit" : "Mark up") { m.markup(item.url) }.padding(4).transition(.pop) }
@@ -2472,7 +2499,7 @@ struct LibTile: View {
                 Button("Copy") { m.click(item.url) }
                 Button(video ? "Edit" : "Mark Up") { m.markup(item.url) }
                 Menu("Share") {
-                    ForEach(NSSharingService.sharingServices(forItems: [item.url]), id: \.title) { svc in
+                    ForEach(ShareServices.for(item.url), id: \.title) { svc in
                         Button { svc.perform(withItems: [item.url]) } label: { Label { Text(svc.title) } icon: { Image(nsImage: svc.image) } }
                     }
                 }
@@ -2947,8 +2974,16 @@ enum ScreenAccess {
 /// One of the website's sky paintings, bundled for the setup wizard.
 struct Sky: View {
     let name: String
+    /// Read from disk once per painting, not on every body evaluation of the animated setup wizard.
+    @MainActor private static var cache: [String: NSImage] = [:]
+    @MainActor private static func image(_ name: String) -> NSImage? {
+        if let i = cache[name] { return i }
+        guard let u = Bundle.main.url(forResource: name, withExtension: "jpg"), let i = NSImage(contentsOf: u) else { return nil }
+        cache[name] = i
+        return i
+    }
     var body: some View {
-        if let u = Bundle.main.url(forResource: name, withExtension: "jpg"), let img = NSImage(contentsOf: u) {
+        if let img = Sky.image(name) {
             Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
         } else {
             LinearGradient(colors: [Color(red: 0.53, green: 0.65, blue: 0.96), Color(red: 0.85, green: 0.77, blue: 0.94),
@@ -3187,7 +3222,6 @@ struct SetupView: View {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         TrayLook.refresh()
-        Brand.registerFonts()
         trayC = TrayController(actions: TrayActions(
             markup: { [weak self] s in self?.editor.open(s) },
             openLibrary: { [weak self] in self?.library.show() }
@@ -3211,6 +3245,7 @@ struct SetupView: View {
             .record: { [weak self] in self?.recorder.toggle() },
         ])
         recorder.onPhase = { [weak self] in self?.buildMenu() }
+        recorder.onPreparing = { [weak self] url in self?.clips.preparing(url, "Preparing") }
         recorder.onFinished = { [weak self] url in
             Clip.copyFile(url)
             self?.remember(url)
@@ -3288,7 +3323,9 @@ struct SetupView: View {
     }
 
     private func present(_ shot: Shot, copy: Bool) {
-        if copy { Clip.copy(shot.png) }
+        // Promised, not pushed: handing a 10-20 MB 5K PNG to the pasteboard server is a synchronous copy on the main
+        // thread right as the tray animates in. The bytes are already in memory; they move when something pastes.
+        if copy { let png = shot.png; Clip.copy(promises: [Promise(url: shot.url) { png }]) }
         session.append(shot)
         if session.count > 30 { session.removeFirst() }
         trayC.add(shot)
