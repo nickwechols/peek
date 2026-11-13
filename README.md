@@ -35,6 +35,7 @@ macOS saves every screenshot as a file on your Desktop, and you go digging for i
 | **Copy several, in order** | <kbd>⌘</kbd>-click previews in the tray to pick shots in the order you want, then paste them all at once into Slack, Figma, Linear, your AI of choice or the group chat. |
 | **Mark it up** | Double-click a preview for arrows, boxes, a pen, a highlighter, text, numbered steps and blur. Everything is copied as you go. Press Return and you are done. |
 | **Screen recording** | Record an area or a whole screen, with click rings, your mic and your Mac's sound. The clip lands on your clipboard ready to paste, with one-click GIF and still frames for AI chats. |
+| **Presentation mode** | Record your screen or one window with yourself on camera. Pick a window from a list, mark a retake when you fumble a line and Peek cuts back to your last pause. In the editor your camera stays movable: drag it to a corner, resize it, make it a circle, or hide it and go full screen for any part of the video. |
 | **A quick video editor** | Trim, split and cut parts out, crop without losing anything, mute, and add arrows, boxes, text and numbered steps over time. Return saves a copy and copies it. |
 | **Make it yours** | Seven themes and six accent colors across the Library, both editors and the preview, which you can size, style and drag to any corner. |
 | **Works with your shortcuts** | Screenshots taken with the built-in macOS shortcuts land on your clipboard too. |
@@ -71,7 +72,7 @@ Capture shortcuts can be changed in **Library → Shortcuts**.
 
 ## Privacy
 
-Peek works entirely on your Mac. It makes no network requests and collects nothing. Screenshots are saved to `~/Pictures/Peek`, recordings to `~/Movies/Peek` (or a folder you choose), and to your clipboard, and nowhere else. The microphone is only used while you record with it switched on.
+Peek works entirely on your Mac. It makes no network requests and collects nothing. Screenshots are saved to `~/Pictures/Peek`, recordings to `~/Movies/Peek` (or a folder you choose), and to your clipboard, and nowhere else. The microphone and camera are only used while you record with them switched on, and your camera is saved on your Mac next to the recording.
 
 ## Build from source
 

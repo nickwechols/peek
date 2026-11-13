@@ -151,6 +151,19 @@ enum Present {
 
     struct RenderClip { var start: Double; var end: Double; var mode: CamMode }
 
+    /// Runs an export and reports how far along it is, ten times a second.
+    static func run(_ session: AVAssetExportSession, progress: (@MainActor (Double) -> Void)? = nil) async {
+        let poll = Task { @MainActor in
+            while !Task.isCancelled {
+                progress?(Double(session.progress))
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+        }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in session.exportAsynchronously { cont.resume() } }
+        poll.cancel()
+        await MainActor.run { progress?(1) }
+    }
+
     /// Where the picture ends. Sound and the camera can run a few frames past the last screen frame, and those
     /// frames would play as black with only your camera on them, so everything is measured against the picture.
     static func videoEnd(_ asset: AVAsset) async -> Double {
@@ -187,7 +200,7 @@ enum Present {
 
     /// Screen, camera and annotations, composed frame by frame. Used for the first clip and for every save.
     static func render(screen: URL, camera: URL?, clips: [RenderClip], layout: CamLayout, notes: [(CGImage, Double, Double)],
-                       crop: CGRect?, muted: Bool, to out: URL) async throws {
+                       crop: CGRect?, muted: Bool, to out: URL, progress: (@MainActor (Double) -> Void)? = nil) async throws {
         let sAsset = AVURLAsset(url: screen)
         guard let sv = try await sAsset.loadTracks(withMediaType: .video).first else { throw CocoaError(.fileReadCorruptFile) }
         let natural = try await sv.load(.naturalSize)
@@ -241,7 +254,7 @@ enum Present {
         session.outputFileType = .mp4
         session.videoComposition = vc
         session.shouldOptimizeForNetworkUse = true
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in session.exportAsynchronously { cont.resume() } }
+        await run(session, progress: progress)
         withExtendedLifetime((sAsset, camAsset)) {}
         guard session.status == .completed else { throw session.error ?? CocoaError(.fileWriteUnknown) }
     }
@@ -716,6 +729,12 @@ struct CamOverlay: View {
                         if h && active { NSCursor.openHand.set() }
                     }
                     .gesture(moveGesture(L, f))
+                    .onTapGesture {
+                        // Click your camera to change how it looks: shape, size, mirror, and when it shows.
+                        withAnimation(gentle) {
+                            if !m.cameraOpen { m.toggleCamera() }
+                        }
+                    }
                     .simultaneousGesture(MagnificationGesture()
                         .onChanged { v in
                             if liveW == nil { startW = L.width; withAnimation(snappy) { resizing = true } }
@@ -723,7 +742,7 @@ struct CamOverlay: View {
                         }
                         .onEnded { _ in commitSize() })
                     .allowsHitTesting(active)
-                    .help("Drag to move, drag the corner or pinch to resize")
+                    .help("Click for camera settings. Drag to move, drag the corner or pinch to resize")
             }
         }
         .frame(width: area.width, height: area.height, alignment: .topLeading)

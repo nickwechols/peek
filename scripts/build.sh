@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${VERSION:-1.4.0}"
+VERSION="${VERSION:-1.5.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
 APP=build/Peek.app
 VOL="Peek"

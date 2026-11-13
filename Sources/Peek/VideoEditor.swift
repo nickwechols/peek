@@ -110,6 +110,7 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
     @Published var camStrip: [NSImage] = []
     @Published var selectedSeg: UUID?
     @Published var exporting = false
+    @Published var exportProgress: Double = 0
     @Published var hint: String?
     @Published var ready = false
     @Published var cropAspect: CGFloat?   // nil = free
@@ -677,7 +678,16 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
         if let cut = boundaries.first(where: { $0 > start + 0.5 && $0 < end }) { end = cut }   // stop at the next cut
         if end - start < 0.3 { end = min(total, start + 0.3) }
         let n = VNote(mark: m, start: start, end: end)
-        withAnimation(gentle) { s.notes.append(n); selectedNote = n.id; selectedClip = nil }
+        // One mark per pick: you land back on the pointer with the new mark selected, ready to move or resize.
+        // The tray stays open, so another arrow is one click (or its key) away.
+        withAnimation(gentle) { s.notes.append(n); selectedNote = n.id; selectedClip = nil; selectedSeg = nil; tool = nil }
+    }
+
+    /// Resize a mark: arrows and boxes move an end, text and numbers scale.
+    func reshapeNote(_ id: UUID, pts: [CGPoint]? = nil, scale: CGFloat? = nil) {
+        guard let i = s.notes.firstIndex(where: { $0.id == id }) else { return }
+        if let pts { s.notes[i].mark.pts = pts }
+        if let scale { s.notes[i].mark.scale = min(max(scale, 0.5), 4) }
     }
 
     func nextStep() -> Int { (s.notes.filter { $0.mark.tool == .step }.map(\.mark.n).max() ?? 0) + 1 }
@@ -703,11 +713,12 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
         switch m.tool {
         case .text:
             guard let p = m.pts.first else { return .zero }
-            let w = CGFloat(max(m.text.count, 3)) * 0.03 * natural.height / max(natural.width, 1)
-            return CGRect(x: p.x - pad, y: p.y - 0.035, width: w + pad * 2, height: 0.07)
+            let w = CGFloat(max(m.text.count, 3)) * 0.03 * m.scale * natural.height / max(natural.width, 1)
+            return CGRect(x: p.x - pad, y: p.y - 0.035 * m.scale, width: w + pad * 2, height: 0.07 * m.scale)
         case .step:
             guard let p = m.pts.first else { return .zero }
-            return CGRect(x: p.x - 0.035, y: p.y - 0.035, width: 0.07, height: 0.07)
+            let r = 0.035 * m.scale
+            return CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
         default:
             guard m.pts.count >= 2 else { return .zero }
             return box(m.pts[0], m.pts[1]).insetBy(dx: -pad, dy: -pad)
@@ -813,9 +824,7 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
         session.outputFileType = .mp4
         session.videoComposition = vc
         session.shouldOptimizeForNetworkUse = true
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            session.exportAsynchronously { cont.resume() }
-        }
+        await Present.run(session) { [weak self] p in self?.exportProgress = p }
         guard session.status == .completed else { throw session.error ?? CocoaError(.fileWriteUnknown) }
         if !RecPrefs.keepOriginal, (try? FileManager.default.replaceItemAt(url, withItemAt: out)) != nil { return url }
         return out
@@ -828,7 +837,8 @@ let gentle = Animation.spring(response: 0.38, dampingFraction: 0.86)
         let out = Recordings.sibling(url, "edited")
         let layout = s.cam ?? meta?.layout ?? CamLayout()
         try await Present.render(screen: screenURL, camera: cameraURL, clips: renderClips(),
-                                 layout: layout, notes: notes, crop: s.crop, muted: s.muted, to: out)
+                                 layout: layout, notes: notes, crop: s.crop, muted: s.muted, to: out,
+                                 progress: { [weak self] p in self?.exportProgress = p })
         var final = out
         if !RecPrefs.keepOriginal, (try? FileManager.default.replaceItemAt(url, withItemAt: out)) != nil { final = url }
         var m = meta ?? PresentMeta(screen: screenURL.lastPathComponent, camera: cameraURL?.lastPathComponent, layout: layout, clips: [])
@@ -914,7 +924,9 @@ struct VideoEditorView: View {
             .padding(.top, 12)
             .allowsHitTesting(false)
             if m.exporting {
-                Color.black.opacity(0.35).ignoresSafeArea().transition(.opacity)
+                // Saving takes over the window: nothing behind it can be changed halfway through.
+                Color.black.opacity(0.5).ignoresSafeArea().contentShape(Rectangle()).onTapGesture {}.transition(.opacity)
+                SavingCard(m: m).transition(.modifier(active: Pop(s: 0.9, b: 8, o: 0, y: 8), identity: .rest))
             }
         }
         .environment(\.colorScheme, .dark)
@@ -972,15 +984,19 @@ struct StageView: View {
             if let id = m.editingText, let n = m.s.notes.first(where: { $0.id == id }), let p = n.mark.pts.first {
                 TextField("Type, then Return", text: m.noteBinding(id))
                     .textFieldStyle(.plain)
-                    .font(.system(size: unit(size) * 5, weight: .semibold))
+                    .font(.system(size: unit(size) * 5 * n.mark.scale, weight: .semibold))
                     .foregroundStyle(palette[n.mark.color])
                     .frame(width: max(200, size.width - p.x * size.width - 12), alignment: .leading)
                     .focused($textFocus)
                     .onSubmit { m.commitText() }
-                    .offset(x: p.x * size.width, y: p.y * size.height - unit(size) * 3.2)
+                    .offset(x: p.x * size.width, y: p.y * size.height - unit(size) * 3.2 * n.mark.scale)
                     .onAppear { textFocus = true }
             }
             if m.mode == .crop { CropBox(m: m, size: size) }
+            if m.mode != .crop, m.tool == nil, m.editingText == nil, let id = m.selectedNote,
+               let n = m.visibleNotes(at: m.clock.t).first(where: { $0.id == id }) {
+                NoteHandles(m: m, note: n, size: size)
+            }
         }
     }
 
@@ -1044,6 +1060,57 @@ struct StageView: View {
     }
 }
 
+/// Handles on the selected mark: drag an arrow's ends, a box's corners, or the corner of text and numbers to scale.
+struct NoteHandles: View {
+    @ObservedObject var m: VideoEditorModel
+    let note: VNote
+    let size: CGSize
+    @State private var origin: (pts: [CGPoint], scale: CGFloat)?
+
+    var body: some View {
+        let mk = note.mark
+        ZStack(alignment: .topLeading) {
+            switch mk.tool {
+            case .arrow where mk.pts.count >= 2, .rect where mk.pts.count >= 2:
+                ForEach(0..<2, id: \.self) { k in handle(at: mk.pts[k]) { o, d in
+                    var pts = o.pts
+                    pts[k] = CGPoint(x: pts[k].x + d.x, y: pts[k].y + d.y)
+                    m.reshapeNote(note.id, pts: pts)
+                } }
+            case .text, .step:
+                let b = m.noteBox(mk)
+                handle(at: CGPoint(x: b.maxX, y: b.maxY)) { o, d in
+                    let base = max(b.width * size.width, 20)
+                    m.reshapeNote(note.id, scale: o.scale * (1 + (d.x * size.width + d.y * size.height) / base))
+                }
+            default:
+                EmptyView()
+            }
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+    }
+
+    func handle(at p: CGPoint, _ change: @escaping ((pts: [CGPoint], scale: CGFloat), CGPoint) -> Void) -> some View {
+        Circle().fill(.white)
+            .overlay(Circle().strokeBorder(accent, lineWidth: 2))
+            .frame(width: 11, height: 11)
+            .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+            .frame(width: 26, height: 26)
+            .contentShape(Rectangle())
+            .position(x: p.x * size.width, y: p.y * size.height)
+            .onHover { h in if h { NSCursor.crosshair.set() } }
+            .gesture(DragGesture(minimumDistance: 1)
+                .onChanged { g in
+                    if origin == nil { m.snapshot(); origin = (note.mark.pts, note.mark.scale) }
+                    guard let o = origin else { return }
+                    change(o, CGPoint(x: g.translation.width / size.width, y: g.translation.height / size.height))
+                }
+                .onEnded { _ in origin = nil })
+            .transition(.modifier(active: Pop(s: 0.4, b: 2, o: 0), identity: .rest))
+            .help("Drag to resize")
+    }
+}
+
 /// Crop box over the full frame. Drag inside to move, corners and edges to resize. Click outside applies.
 struct NotesLayer: View {
     @ObservedObject var m: VideoEditorModel
@@ -1062,6 +1129,31 @@ struct NotesLayer: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Saving, in the middle of the screen: how far along it is, and what happens when it is done.
+struct SavingCard: View {
+    @ObservedObject var m: VideoEditorModel
+    var body: some View {
+        let p = min(max(m.exportProgress, 0), 1)
+        VStack(spacing: 14) {
+            ZStack {
+                Circle().stroke(Color.white.opacity(0.12), lineWidth: 4)
+                Circle().trim(from: 0, to: max(0.02, p)).stroke(accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 0.25), value: p)
+                Text("\(Int((p * 100).rounded()))%").font(.system(size: 13, weight: .semibold)).monospacedDigit().foregroundStyle(.white)
+                    .contentTransition(.numericText())
+            }
+            .frame(width: 58, height: 58)
+            VStack(spacing: 4) {
+                Text("Saving your video").font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                Text("It goes to your clipboard when it is done").font(.system(size: 12.5, weight: .medium)).foregroundStyle(.white.opacity(0.55))
+            }
+        }
+        .padding(.horizontal, 30).padding(.vertical, 24)
+        .glass(20)
     }
 }
 
@@ -1514,6 +1606,7 @@ struct TimelineView2: View {
             withAnimation(gentle) {
                 m.selectedNote = nil
                 if let c = p.clip { m.selectedClip = c; m.selectedSeg = nil } else { m.selectedSeg = p.seg; m.selectedClip = nil }
+                if !m.cameraOpen { m.cameraOpen = true; m.markupOpen = false; m.tool = nil }
             }
         })
         .onContinuousHover { phase in
@@ -1917,6 +2010,7 @@ struct EditorBar: View {
             return
         }
         m.pause()
+        m.exportProgress = 0
         withAnimation(gentle) { m.exporting = true }
         Task {
             do {
