@@ -2389,6 +2389,7 @@ struct LibraryView: View {
                 .buttonStyle(Squish())
             }
             Spacer()
+            UpdateCard().padding(.bottom, 14)
         }
         .padding(.horizontal, 12)
     }
@@ -2840,6 +2841,7 @@ struct SettingsView: View {
                     }
                     .padding(16)
                 }
+                Group2(title: "Updates") { UpdateSettings() }
             }
             .toggleStyle(RowToggle())
             .frame(maxWidth: 560, alignment: .leading)
@@ -3222,6 +3224,8 @@ struct SetupView: View {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         TrayLook.refresh()
+        Updater.shared.onChange = { [weak self] in self?.buildMenu() }
+        Updater.shared.start()
         trayC = TrayController(actions: TrayActions(
             markup: { [weak self] s in self?.editor.open(s) },
             openLibrary: { [weak self] in self?.library.show() }
@@ -3286,6 +3290,12 @@ struct SetupView: View {
     @objc func toggleRecording() { recorder.toggle() }
     @objc func pauseRecording() { recorder.togglePause() }
     @objc func showRecordings() { NSWorkspace.shared.open(Recordings.dir) }
+    /// The update happens in the Library's sidebar, so you can watch it.
+    @objc func installUpdate() {
+        library.show()
+        Updater.shared.dismissed = false
+        Updater.shared.install()
+    }
     @objc func showSettings() { library.show(tab: 2) }
     @objc func showSetup() { setup.show() }
     @objc func showAbout() {
@@ -3357,6 +3367,10 @@ struct SetupView: View {
             status.button?.image = mark
         }
         let menu = NSMenu()
+        if let v = Updater.shared.info?.version, Updater.shared.phase == .available {
+            menu.addItem(item("Update to Peek \(v)", #selector(installUpdate)))
+            menu.addItem(.separator())
+        }
         if recording {
             menu.addItem(hotkeyItem("Stop Recording", #selector(toggleRecording), .record))
             menu.addItem(item(recorder.paused ? "Resume Recording" : "Pause Recording", #selector(pauseRecording)))

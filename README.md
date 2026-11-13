@@ -72,7 +72,7 @@ Capture shortcuts can be changed in **Library → Shortcuts**.
 
 ## Privacy
 
-Peek works entirely on your Mac. It makes no network requests and collects nothing. Screenshots are saved to `~/Pictures/Peek`, recordings to `~/Movies/Peek` (or a folder you choose), and to your clipboard, and nowhere else. The microphone and camera are only used while you record with them switched on, and your camera is saved on your Mac next to the recording.
+Peek works entirely on your Mac and collects nothing. Its only network request is the update check: a plain download of a small file from Peek's GitHub releases, with no account, identifier or cookies, which you can turn off in Settings. Updates only install if they are signed with Peek's release key. Screenshots are saved to `~/Pictures/Peek`, recordings to `~/Movies/Peek` (or a folder you choose), and to your clipboard, and nowhere else. The microphone and camera are only used while you record with them switched on, and your camera is saved on your Mac next to the recording.
 
 ## Build from source
 

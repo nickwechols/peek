@@ -14,6 +14,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Build app and installer
         env:
           VERSION: ${{ github.ref_name }}
@@ -23,8 +25,43 @@ jobs:
         run: |
           export VERSION="${VERSION#v}"
           bash ./scripts/build.sh
+      # In-app updates: a zip of the app, signed with Peek's release key, and update.json describing it.
+      # Installed copies of Peek fetch update.json from the latest release and only install a correctly signed zip.
+      # The tag's message becomes the "what's new" text in the app:  git tag -a v1.6.0 -m "What changed"
+      - name: Sign the in-app update
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$UPDATE_PRIVATE_KEY" ]; then
+            echo "::warning::UPDATE_PRIVATE_KEY is not set, so this release has no in-app update."
+            exit 0
+          fi
+          ditto -c -k --sequesterRsrc --keepParent build/Peek.app build/Peek.zip
+          export SIG=$(swift scripts/sign-update.swift build/Peek.zip)
+          [ -n "$SIG" ] || { echo "::error::Signing the update failed"; exit 1; }
+          export SIZE=$(stat -f%z build/Peek.zip)
+          export NOTES="$(git tag -l --format='%(contents)' "$TAG" | sed '/-----BEGIN PGP/,$d')"
+          python3 - <<'PY'
+          import json, os
+          tag = os.environ["TAG"]
+          notes = os.environ.get("NOTES", "").strip() or "Fixes and improvements."
+          json.dump({
+              "version": tag.lstrip("v"),
+              "notes": notes,
+              "url": f"https://github.com/{os.environ['REPO']}/releases/download/{tag}/Peek.zip",
+              "size": int(os.environ["SIZE"]),
+              "signature": os.environ["SIG"],
+              "minimumSystem": "13.0",
+          }, open("build/update.json", "w"), indent=2)
+          PY
+          cat build/update.json
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/Peek.dmg
+          files: |
+            build/Peek.dmg
+            build/Peek.zip
+            build/update.json
           generate_release_notes: true
